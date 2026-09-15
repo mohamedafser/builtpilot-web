@@ -218,7 +218,16 @@ export function SignupForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form
+      noValidate
+      className="space-y-5"
+      onSubmit={(event) => {
+        // Always block native POST to /signup — Next.js treats those as
+        // Server Actions and throws UnrecognizedActionError.
+        event.preventDefault();
+        void handleSubmit(onSubmit)(event);
+      }}
+    >
       {formError ? <Alert variant="error">{formError}</Alert> : null}
 
       <div className="grid gap-5 sm:grid-cols-2">

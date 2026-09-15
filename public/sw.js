@@ -1,5 +1,5 @@
 const APP_SHELL = ["/", "/manifest.webmanifest"];
-const CACHE_NAME = "buildpilot-shell-v1";
+const CACHE_NAME = "buildpilot-shell-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -51,7 +51,14 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form
+      noValidate
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSubmit(onSubmit)(event);
+      }}
+    >
       {formError ? <Alert variant="error">{formError}</Alert> : null}
 
       <div>
