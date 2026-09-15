@@ -213,16 +213,6 @@ export function SignupForm({
               ? "Resend confirmation email"
               : `Resend available in ${formatCountdown(cooldownSeconds)}`}
         </Button>
-
-        <p className="text-center text-sm text-stone-500">
-          Already confirmed?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-amber-700 transition-colors hover:text-amber-800"
-          >
-            Sign in
-          </Link>
-        </p>
       </div>
     );
   }

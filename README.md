@@ -120,16 +120,39 @@ The migrations create:
 
 ### 5. Configure Auth redirect URLs
 
-In **Authentication → URL Configuration**:
+In **Authentication → URL Configuration** set both local and production values.
 
-- Site URL: `http://localhost:3000`
+**Production (required for live signup emails):**
+
+- Site URL: `https://builtpilot-web.vercel.app`
 - Redirect URLs:
+  - `https://builtpilot-web.vercel.app/api/auth/callback`
+  - `https://builtpilot-web.vercel.app/api/auth/callback?next=/reset-password`
   - `http://localhost:3000/api/auth/callback`
   - `http://localhost:3000/api/auth/callback?next=/reset-password`
 
-For local development, you can disable **Confirm email** under **Authentication → Providers → Email**. If confirmation stays enabled, new users will receive an email before they can sign in.
+Also set this Vercel Production environment variable:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://builtpilot-web.vercel.app
+```
+
+If Site URL stays on localhost, confirmation emails keep redirecting to localhost even when the app is deployed.
+
+For local-only development, you can temporarily use Site URL `http://localhost:3000`, or disable **Confirm email** under **Authentication → Providers → Email**.
 
 Password reset emails use the same callback route and then send the user to `/reset-password`.
+
+### Confirm signup email template
+
+Paste `supabase/templates/confirm-signup.html` into
+**Authentication → Email Templates → Confirm signup**.
+
+Subject:
+
+```text
+Confirm your BuildPilot account
+```
 
 ### 6. Start the app
 
