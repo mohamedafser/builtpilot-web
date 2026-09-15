@@ -4,6 +4,7 @@ import {
   SIGNUP_RESEND_COOLDOWN_SECONDS,
 } from "@/lib/auth/constants";
 import { getAuthErrorMessage, logAuthError } from "@/lib/auth/errors";
+import { resolveAuthOrigin } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -14,6 +15,8 @@ import {
 } from "@/lib/validations/auth";
 import { getZodErrorMessage } from "@/lib/validations/error";
 import { cookies } from "next/headers";
+
+export { resolveAuthOrigin };
 
 export type AuthServiceError = {
   ok: false;
@@ -40,25 +43,6 @@ function fail(
 
 function ok<T>(message: string, data: T): AuthServiceSuccess<T> {
   return { ok: true, message, data };
-}
-
-export function resolveAuthOrigin(request: Request) {
-  const requestOrigin = request.headers.get("origin")?.trim();
-  if (requestOrigin) {
-    return requestOrigin.replace(/\/$/, "");
-  }
-
-  try {
-    return new URL(request.url).origin.replace(/\/$/, "");
-  } catch {
-    // fall through
-  }
-
-  const configured =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    "https://buildpilot-henna.vercel.app";
-
-  return configured.replace(/\/$/, "");
 }
 
 export function safeNextPath(nextPath?: string | null) {

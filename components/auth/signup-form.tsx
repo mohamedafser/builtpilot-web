@@ -50,7 +50,11 @@ type ResendResponse = {
   retryAfterSeconds: number;
 };
 
-export function SignupForm() {
+export function SignupForm({
+  onAwaitingConfirmationChange,
+}: {
+  onAwaitingConfirmationChange?: (awaiting: boolean) => void;
+} = {}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -84,6 +88,10 @@ export function SignupForm() {
     const detected = detectCountryFromBrowser();
     setValue("country_code", detected);
   }, [setValue]);
+
+  useEffect(() => {
+    onAwaitingConfirmationChange?.(Boolean(successMessage && pendingEmail));
+  }, [successMessage, pendingEmail, onAwaitingConfirmationChange]);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) {
