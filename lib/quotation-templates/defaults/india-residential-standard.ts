@@ -1,0 +1,136 @@
+import type { QuotationTemplateDefinition } from "@/lib/quotation-templates/types";
+
+const indiaStandardFloors = [
+  { floor: 0, name: "Ground Floor", ratePerSqFt: 2600 },
+  { floor: 1, name: "First Floor", ratePerSqFt: 2700 },
+  { floor: 2, name: "Second Floor", ratePerSqFt: 2800 },
+  { floor: 3, name: "Third Floor", ratePerSqFt: 2900 },
+];
+
+const indiaPremiumFloors = [
+  { floor: 0, name: "Ground Floor", ratePerSqFt: 3100 },
+  { floor: 1, name: "First Floor", ratePerSqFt: 3200 },
+  { floor: 2, name: "Second Floor", ratePerSqFt: 3300 },
+  { floor: 3, name: "Third Floor", ratePerSqFt: 3400 },
+];
+
+const indiaLuxuryFloors = [
+  { floor: 0, name: "Ground Floor", ratePerSqFt: 3800 },
+  { floor: 1, name: "First Floor", ratePerSqFt: 3900 },
+  { floor: 2, name: "Second Floor", ratePerSqFt: 4000 },
+  { floor: 3, name: "Third Floor", ratePerSqFt: 4100 },
+];
+
+export const indiaResidentialStandard: QuotationTemplateDefinition = {
+  id: "builtin:in-residential-standard",
+  name: "Residential Construction – Standard",
+  description:
+    "Illustrative India residential estimate with editable floor, material, and labour rates.",
+  countryCode: "IN",
+  currencyCode: "INR",
+  projectType: "residential",
+  referenceAreaSqFt: 1000,
+  defaultQualityId: "standard",
+  qualityLevels: [
+    {
+      id: "standard",
+      label: "Standard",
+      floorRates: indiaStandardFloors,
+    },
+    {
+      id: "premium",
+      label: "Premium",
+      floorRates: indiaPremiumFloors,
+    },
+    {
+      id: "luxury",
+      label: "Luxury",
+      floorRates: indiaLuxuryFloors,
+    },
+  ],
+  materials: [
+    { id: "in-m-cement", name: "Cement", category: "material", unit: "bag", quantity: 400, unitPrice: 420 },
+    { id: "in-m-steel", name: "Steel", category: "material", unit: "kg", quantity: 4000, unitPrice: 65 },
+    { id: "in-m-sand", name: "Sand", category: "material", unit: "cft", quantity: 1200, unitPrice: 55 },
+    { id: "in-m-aggregate", name: "Aggregate / Jelly", category: "material", unit: "cft", quantity: 1000, unitPrice: 45 },
+    { id: "in-m-bricks", name: "Bricks / Blocks", category: "material", unit: "nos", quantity: 12000, unitPrice: 8 },
+    { id: "in-m-tiles", name: "Tiles", category: "material", unit: "sqft", quantity: 900, unitPrice: 55 },
+    { id: "in-m-plumbing", name: "Plumbing materials", category: "material", unit: "lot", quantity: 1, unitPrice: 75000 },
+    { id: "in-m-electrical", name: "Electrical materials", category: "material", unit: "lot", quantity: 1, unitPrice: 65000 },
+    { id: "in-m-paint", name: "Paint", category: "material", unit: "ltr", quantity: 120, unitPrice: 280 },
+    { id: "in-m-waterproof", name: "Waterproofing", category: "material", unit: "lot", quantity: 1, unitPrice: 35000 },
+    { id: "in-m-doors", name: "Doors", category: "material", unit: "nos", quantity: 8, unitPrice: 12000 },
+    { id: "in-m-windows", name: "Windows", category: "material", unit: "nos", quantity: 10, unitPrice: 9000 },
+    { id: "in-m-sanitary", name: "Sanitary fittings", category: "material", unit: "lot", quantity: 1, unitPrice: 45000 },
+    { id: "in-m-kitchen", name: "Kitchen materials", category: "material", unit: "lot", quantity: 1, unitPrice: 40000 },
+    { id: "in-m-hardware", name: "Hardware", category: "material", unit: "lot", quantity: 1, unitPrice: 15000 },
+    { id: "in-m-other", name: "Other materials", category: "material", unit: "lot", quantity: 1, unitPrice: 25000 },
+  ],
+  labour: [
+    { id: "in-l-mason", name: "Mason", category: "labour", unit: "day", quantity: 60, unitPrice: 900 },
+    { id: "in-l-helper", name: "Helper", category: "labour", unit: "day", quantity: 90, unitPrice: 550 },
+    { id: "in-l-carpenter", name: "Carpenter", category: "labour", unit: "day", quantity: 25, unitPrice: 950 },
+    { id: "in-l-electrician", name: "Electrician", category: "labour", unit: "day", quantity: 20, unitPrice: 1000 },
+    { id: "in-l-plumber", name: "Plumber", category: "labour", unit: "day", quantity: 18, unitPrice: 1000 },
+    { id: "in-l-painter", name: "Painter", category: "labour", unit: "day", quantity: 22, unitPrice: 850 },
+    { id: "in-l-tile", name: "Tile worker", category: "labour", unit: "day", quantity: 20, unitPrice: 900 },
+    { id: "in-l-steel", name: "Steel worker", category: "labour", unit: "day", quantity: 18, unitPrice: 950 },
+    { id: "in-l-operator", name: "Equipment / operator", category: "labour", unit: "day", quantity: 10, unitPrice: 1500 },
+    { id: "in-l-other", name: "Other labour", category: "labour", unit: "day", quantity: 15, unitPrice: 700 },
+  ],
+  otherCosts: [
+    { id: "in-o-equipment", name: "Equipment", category: "other", unit: "lot", quantity: 1, unitPrice: 40000 },
+    { id: "in-o-transport", name: "Transportation", category: "other", unit: "lot", quantity: 1, unitPrice: 25000 },
+    { id: "in-o-site", name: "Site preparation", category: "other", unit: "lot", quantity: 1, unitPrice: 30000 },
+    { id: "in-o-temp", name: "Temporary works", category: "other", unit: "lot", quantity: 1, unitPrice: 20000 },
+    { id: "in-o-waste", name: "Waste disposal", category: "other", unit: "lot", quantity: 1, unitPrice: 12000 },
+    { id: "in-o-misc", name: "Miscellaneous", category: "other", unit: "lot", quantity: 1, unitPrice: 15000 },
+  ],
+  includedItems: [
+    { id: "in-i-1", text: "Foundation work", included: true },
+    { id: "in-i-2", text: "RCC structural work", included: true },
+    { id: "in-i-3", text: "Brick / block work", included: true },
+    { id: "in-i-4", text: "Internal plastering", included: true },
+    { id: "in-i-5", text: "Basic flooring", included: true },
+    { id: "in-i-6", text: "Basic electrical work", included: true },
+    { id: "in-i-7", text: "Basic plumbing work", included: true },
+    { id: "in-i-8", text: "Internal painting", included: true },
+    { id: "in-i-9", text: "Basic waterproofing", included: true },
+    { id: "in-i-10", text: "Labour charges", included: true },
+    { id: "in-i-11", text: "Standard construction materials", included: true },
+  ],
+  excludedItems: [
+    { id: "in-e-1", text: "Land cost", included: false },
+    { id: "in-e-2", text: "Architect fees", included: false },
+    { id: "in-e-3", text: "Structural consultant fees", included: false },
+    { id: "in-e-4", text: "Government approval fees", included: false },
+    { id: "in-e-5", text: "Plan approval charges", included: false },
+    { id: "in-e-6", text: "Premium sanitary fittings", included: false },
+    { id: "in-e-7", text: "Premium electrical fixtures", included: false },
+    { id: "in-e-8", text: "Modular kitchen", included: false },
+    { id: "in-e-9", text: "Wardrobes", included: false },
+    { id: "in-e-10", text: "Furniture", included: false },
+    { id: "in-e-11", text: "Air conditioning", included: false },
+    { id: "in-e-12", text: "Solar system", included: false },
+    { id: "in-e-13", text: "Lift / elevator", included: false },
+    { id: "in-e-14", text: "Boundary wall", included: false },
+    { id: "in-e-15", text: "Landscaping", included: false },
+    { id: "in-e-16", text: "Borewell", included: false },
+    { id: "in-e-17", text: "External development work", included: false },
+  ],
+  addons: [
+    { id: "in-a-kitchen", name: "Modular Kitchen", amount: 250000, description: "Basic modular kitchen package" },
+    { id: "in-a-wardrobes", name: "Wardrobes", amount: 150000 },
+    { id: "in-a-solar", name: "Solar System", amount: 120000 },
+    { id: "in-a-lift", name: "Lift", amount: 800000 },
+    { id: "in-a-flooring", name: "Premium Flooring", amount: 300, ratePerSqFt: true, description: "Upgrade over basic flooring" },
+  ],
+  defaultTaxPercentage: 18,
+  defaultContingencyPercentage: 5,
+  defaultDiscountPercentage: 0,
+  defaultNotes:
+    "Default rates are estimates and should be reviewed and adjusted based on project location, specifications, material quality, labour rates, and current market prices.",
+  defaultTerms:
+    "This estimate is based on the selected template rates. Final quotation is subject to site inspection and material specification confirmation.",
+  source: "builtin",
+};
