@@ -5,6 +5,7 @@ import { Logo } from "@/components/layout/logo";
 import { useLocale } from "@/lib/i18n/locale-context";
 import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
+import { Home } from "lucide-react";
 import { Bricolage_Grotesque } from "next/font/google";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -95,13 +96,15 @@ export function AuthShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-3 lg:hidden">
               <Logo href="/" />
             </div>
-            <div className="ml-auto flex items-center gap-3">
-              <LanguageSwitcher />
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
+              <LanguageSwitcher className="hidden sm:inline-flex" />
+              <LanguageSwitcher compact className="sm:hidden" />
               <Link
                 href="/"
-                className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-900 lg:hidden"
+                aria-label="Home"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 lg:hidden"
               >
-                Home
+                <Home className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               </Link>
             </div>
           </div>

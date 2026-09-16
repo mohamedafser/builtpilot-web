@@ -17,9 +17,11 @@ import { useTransition } from "react";
 export function LanguageSwitcher({
   className,
   variant = "default",
+  compact = false,
 }: {
   className?: string;
   variant?: "default" | "dark";
+  compact?: boolean;
 }) {
   const router = useRouter();
   const { language, setLanguage, t } = useLocale();
@@ -59,7 +61,8 @@ export function LanguageSwitcher({
       <span className="relative inline-flex items-center">
         <Languages
           className={cn(
-            "pointer-events-none absolute left-2.5 z-10 h-3.5 w-3.5",
+            "pointer-events-none absolute z-10 h-3.5 w-3.5",
+            compact ? "left-2" : "left-2.5",
             isDark ? "text-stone-300" : "text-stone-500",
           )}
           aria-hidden
@@ -72,7 +75,10 @@ export function LanguageSwitcher({
             onChange(event.target.value as AppLanguage)
           }
           className={cn(
-            "h-9 w-[8.75rem] appearance-none py-0 pl-8 pr-8 text-xs font-medium shadow-sm sm:w-[9.5rem] sm:text-sm",
+            "h-9 appearance-none py-0 text-xs font-medium shadow-sm",
+            compact
+              ? "w-[4.5rem] pl-7 pr-6"
+              : "w-[8.75rem] pl-8 pr-8 sm:w-[9.5rem] sm:text-sm",
             isDark
               ? "border-stone-600 bg-stone-900 text-white focus:border-amber-500 focus:ring-amber-500/20"
               : "border-stone-300 bg-white text-stone-900",
@@ -80,13 +86,14 @@ export function LanguageSwitcher({
         >
           {SUPPORTED_LANGUAGES.map((code) => (
             <option key={code} value={code}>
-              {LANGUAGE_LABELS[code]}
+              {compact ? code.toUpperCase() : LANGUAGE_LABELS[code]}
             </option>
           ))}
         </Select>
         <ChevronDown
           className={cn(
-            "pointer-events-none absolute right-2 h-3.5 w-3.5",
+            "pointer-events-none absolute h-3.5 w-3.5",
+            compact ? "right-1.5" : "right-2",
             isDark ? "text-stone-400" : "text-stone-500",
           )}
           aria-hidden

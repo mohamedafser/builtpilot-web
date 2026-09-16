@@ -44,7 +44,7 @@ export function Header({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <LanguageSwitcher />
+        <LanguageSwitcher className="hidden lg:inline-flex" />
 
         <div className="hidden items-center gap-3 lg:flex">
           <NotificationBell />

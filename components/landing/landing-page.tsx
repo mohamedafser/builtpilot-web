@@ -145,7 +145,7 @@ export function LandingPage() {
       <header className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
         <Logo />
         <div className="flex items-center gap-2 sm:gap-3">
-          <LanguageSwitcher />
+          <LanguageSwitcher className="hidden sm:inline-flex" />
           <Link href="/login" className={linkButtonClassName("ghost", "md")}>
             <WithIcon icon={LogIn}>{t("common.signIn")}</WithIcon>
           </Link>

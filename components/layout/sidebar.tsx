@@ -413,7 +413,7 @@ export function Sidebar({
         </div>
 
         <div className="flex items-center gap-2">
-          <LanguageSwitcher variant="dark" />
+          <LanguageSwitcher compact />
           <NotificationBell />
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-900 text-xs font-semibold text-white">
             {getInitials(userName)}
