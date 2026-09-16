@@ -25,6 +25,13 @@ function isRateLimited(error: AuthErrorLike, message: string, code: string) {
   );
 }
 
+function isEmailSendRateLimited(message: string, code: string) {
+  return (
+    includesAny(message, ["email rate limit", "over_email_send"]) ||
+    includesAny(code, ["over_email_send_rate_limit", "over_email"])
+  );
+}
+
 function isDuplicateEmail(message: string, code: string) {
   return (
     includesAny(message, [
@@ -49,6 +56,10 @@ export function getAuthErrorMessage(
 ): string {
   const message = error.message.toLowerCase();
   const code = error.code?.toLowerCase() ?? "";
+
+  if (isEmailSendRateLimited(message, code)) {
+    return AUTH_MESSAGES.emailSendRateLimited;
+  }
 
   if (isRateLimited(error, message, code)) {
     return AUTH_MESSAGES.rateLimited;

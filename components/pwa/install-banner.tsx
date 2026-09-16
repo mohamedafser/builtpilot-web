@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Share, Smartphone, X } from "lucide-react";
+import { Download, MonitorSmartphone, Smartphone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type DevicePlatform = "ios" | "android" | "desktop";
@@ -10,18 +10,14 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+const DISMISS_KEY = "bp_pwa_banner_dismissed";
+
 function detectPlatform(): DevicePlatform {
   if (typeof navigator === "undefined") {
     return "desktop";
   }
 
   const ua = navigator.userAgent || "";
-  const hasTouchSupport = navigator.maxTouchPoints > 0;
-  const isSmallTouchViewport =
-    typeof window !== "undefined" &&
-    window.innerWidth <= 768 &&
-    (window.matchMedia("(pointer: coarse)").matches || hasTouchSupport);
-
   const isIOS =
     /iPad|iPhone|iPod/.test(ua) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -30,11 +26,26 @@ function detectPlatform(): DevicePlatform {
     return "ios";
   }
 
-  if (/Android/i.test(ua) || isSmallTouchViewport) {
+  if (/Android/i.test(ua)) {
     return "android";
   }
 
   return "desktop";
+}
+
+function isAppInstalled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const standaloneDisplay = window.matchMedia(
+    "(display-mode: standalone)",
+  ).matches;
+  const iosStandalone =
+    "standalone" in navigator &&
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+
+  return standaloneDisplay || iosStandalone;
 }
 
 export function PwaInstallBanner() {
@@ -48,36 +59,34 @@ export function PwaInstallBanner() {
     const currentPlatform = detectPlatform();
     setPlatform(currentPlatform);
 
-    const isStandalone =
+    if (isAppInstalled()) {
+      return;
+    }
+
+    const dismissed =
       typeof window !== "undefined" &&
-      window.matchMedia("(display-mode: standalone)").matches;
+      window.sessionStorage.getItem(DISMISS_KEY) === "1";
     const isTestMode =
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("pwa-test") === "1";
-    const shouldShowOnMobileViewport =
-      typeof window !== "undefined" &&
-      window.innerWidth <= 768 &&
-      (window.matchMedia("(pointer: coarse)").matches ||
-        navigator.maxTouchPoints > 0);
 
-    if (
-      (currentPlatform !== "desktop" ||
-        isTestMode ||
-        shouldShowOnMobileViewport) &&
-      !isStandalone
-    ) {
+    if (!dismissed || isTestMode) {
       setIsVisible(true);
     }
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
-      setIsVisible(true);
+      if (!isAppInstalled()) {
+        setIsVisible(true);
+      }
     };
 
     const handleAppInstalled = () => {
       setIsVisible(false);
       setShowInstructions(false);
+      setDeferredPrompt(null);
+      window.sessionStorage.setItem(DISMISS_KEY, "1");
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -94,7 +103,7 @@ export function PwaInstallBanner() {
 
   const handleInstall = async () => {
     if (platform === "ios") {
-      setShowInstructions(true);
+      setShowInstructions((current) => !current);
       return;
     }
 
@@ -103,82 +112,82 @@ export function PwaInstallBanner() {
       await deferredPrompt.userChoice;
       setDeferredPrompt(null);
       setIsVisible(false);
+      window.sessionStorage.setItem(DISMISS_KEY, "1");
       return;
     }
 
-    setShowInstructions(true);
+    setShowInstructions((current) => !current);
   };
 
-  if (!isVisible || platform === "desktop") {
+  const handleClose = () => {
+    setIsVisible(false);
+    setShowInstructions(false);
+    window.sessionStorage.setItem(DISMISS_KEY, "1");
+  };
+
+  if (!isVisible) {
     return null;
   }
 
   const isAndroid = platform === "android";
+  const isDesktop = platform === "desktop";
+  const Icon = isDesktop ? MonitorSmartphone : Smartphone;
 
   return (
-    <div className="fixed inset-x-0 top-4 z-50 flex justify-center px-3 sm:px-6">
-      <div className="w-full max-w-6xl rounded-[28px] border border-amber-900/20 bg-[#4e3627] px-4 py-4 text-stone-50 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.45)] sm:px-6 sm:py-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-stone-200/20 ring-1 ring-white/10">
-            <Smartphone className="h-8 w-8 text-amber-100" />
+    <div className="fixed right-4 bottom-4 z-50 w-[15.5rem] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] sm:right-5 sm:bottom-5">
+      <div className="overflow-hidden rounded-2xl border border-stone-200/70 bg-white/90 shadow-[0_20px_50px_-24px_rgba(28,25,23,0.35)] ring-1 ring-amber-100/80 backdrop-blur-md">
+        <div className="flex items-center gap-2.5 p-2.5">
+          <div className="landing-pwa-pulse flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-[0_8px_20px_-10px_rgba(234,88,12,0.8)]">
+            <Icon className="h-4 w-4" />
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Install BuildPilot App
+            <p className="truncate text-xs font-semibold text-stone-900">
+              Install app
             </p>
-            <p className="mt-1 text-sm leading-6 text-stone-200 sm:text-base">
-              {isAndroid
-                ? "Add BuildPilot to your home screen for quick access."
-                : "Access projects and measurements directly from your home screen!"}
+            <p className="truncate text-[10px] text-stone-500">
+              {isDesktop
+                ? "Desktop access"
+                : isAndroid
+                  ? "Add to home screen"
+                  : "Add to home screen"}
             </p>
-
-            {showInstructions ? (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/10 p-3 text-left text-sm text-stone-100">
-                <p className="mb-2 font-semibold text-white">
-                  {isAndroid
-                    ? "How to install on Android"
-                    : "How to install on iPhone / iPad"}
-                </p>
-
-                {isAndroid ? (
-                  <ol className="list-decimal space-y-1 pl-5 text-stone-200">
-                    <li>Open this page in Chrome.</li>
-                    <li>Tap the menu button in the top-right.</li>
-                    <li>Select “Install app” or “Add to Home screen”.</li>
-                    <li>Tap “Install” to finish.</li>
-                  </ol>
-                ) : (
-                  <ol className="list-decimal space-y-1 pl-5 text-stone-200">
-                    <li>Tap the Share button at the bottom of Safari.</li>
-                    <li>Select “Add to Home Screen”.</li>
-                    <li>Tap “Add” in the top-right corner.</li>
-                  </ol>
-                )}
-              </div>
-            ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-3">
-            <button
-              type="button"
-              onClick={handleInstall}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#f3d77a] px-5 py-3 text-base font-bold text-stone-900 shadow-sm transition hover:bg-[#efcd5e]"
-            >
-              <Download className="h-5 w-5" />
-              Install
-            </button>
-
-            <button
-              type="button"
-              aria-label="Close install prompt"
-              onClick={() => setIsVisible(false)}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="Close install prompt"
+            onClick={handleClose}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
+
+        <div className="border-t border-stone-100 px-2.5 py-2">
+          <button
+            type="button"
+            onClick={handleInstall}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-stone-800"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Install BuildPilot
+          </button>
+        </div>
+
+        {showInstructions ? (
+          <div className="border-t border-stone-100 bg-stone-50/90 px-2.5 py-2 text-[10px] leading-4 text-stone-600">
+            {isDesktop ? (
+              <p>
+                Open Chrome or Edge menu → Install app / Install BuildPilot.
+              </p>
+            ) : isAndroid ? (
+              <p>Chrome menu → Install app or Add to Home screen.</p>
+            ) : (
+              <p>Safari → Share → Add to Home Screen → Add.</p>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

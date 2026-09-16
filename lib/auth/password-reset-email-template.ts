@@ -1,7 +1,7 @@
 /**
- * BuildPilot signup verification email (OTP) sent via app SMTP.
+ * BuildPilot password-reset verification email (OTP) sent via app SMTP.
  */
-export function buildSignupEmailTemplate({
+export function buildPasswordResetEmailTemplate({
   firstName,
   otp,
   appName = "BuildPilot",
@@ -11,7 +11,7 @@ export function buildSignupEmailTemplate({
   appName?: string;
 }) {
   const safeName = firstName?.trim() || "there";
-  const subject = `Your ${appName} verification code`;
+  const subject = `Your ${appName} password reset code`;
 
   const html = `
     <!DOCTYPE html>
@@ -34,7 +34,7 @@ export function buildSignupEmailTemplate({
                         <td style="padding-left:12px;font-size:18px;font-weight:700;color:#1f1a17;">${appName}</td>
                       </tr>
                     </table>
-                    <h1 style="margin:20px 0 0;font-size:28px;line-height:1.25;color:#1f1a17;font-weight:700;">Verify your email</h1>
+                    <h1 style="margin:20px 0 0;font-size:28px;line-height:1.25;color:#1f1a17;font-weight:700;">Reset your password</h1>
                   </td>
                 </tr>
                 <tr>
@@ -42,31 +42,26 @@ export function buildSignupEmailTemplate({
                     <p style="margin:0 0 16px;color:#433c39;font-size:16px;line-height:1.7;">
                       Hi ${safeName},
                     </p>
-                    <p style="margin:0 0 16px;color:#433c39;font-size:16px;line-height:1.7;">
-                      Thanks for signing up for ${appName}.
-                    </p>
                     <p style="margin:0 0 24px;color:#433c39;font-size:16px;line-height:1.7;">
-                      Use the verification code below to verify your email address:
+                      Use the verification code below to reset your ${appName} password:
                     </p>
-
                     <div style="margin:8px 0 24px;text-align:center;">
                       <div style="display:inline-block;background:#fff8f3;border:1px solid #f0e4dc;border-radius:16px;padding:18px 28px;font-size:36px;letter-spacing:10px;font-weight:700;color:#1f1a17;">
                         ${otp}
                       </div>
                     </div>
-
                     <p style="margin:0 0 16px;color:#5f5654;font-size:14px;line-height:1.7;text-align:center;">
                       This code will expire in 5 minutes.
                     </p>
                     <p style="margin:0;color:#433c39;font-size:15px;line-height:1.7;">
-                      Enter this code in the ${appName} app to complete your account setup.
+                      Enter this code in the ${appName} app to continue.
                     </p>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:0 28px 28px;">
                     <p style="margin:0 0 16px;color:#5f5654;font-size:14px;line-height:1.7;">
-                      If you didn&apos;t create a ${appName} account, you can safely ignore this email.
+                      If you didn&apos;t request a password reset, you can safely ignore this email.
                     </p>
                     <p style="margin:0;color:#433c39;font-size:15px;line-height:1.7;">
                       Thanks,<br />
@@ -90,27 +85,20 @@ export function buildSignupEmailTemplate({
     </html>
   `;
 
-  const text = `Verify your email
+  const text = `Reset your password
 
 Hi ${safeName},
 
-Thanks for signing up for ${appName}.
-
-Your ${appName} verification code is:
+Use this ${appName} verification code to reset your password:
 
 ${otp}
 
 This code will expire in 5 minutes.
 
-Enter this code in the ${appName} app to complete your account setup.
-
-If you didn't create a ${appName} account, you can safely ignore this email.
+If you didn't request a password reset, you can safely ignore this email.
 
 Thanks,
-The ${appName} Team
-
-${appName}
-Construction Project Management, Simplified.`;
+The ${appName} Team`;
 
   return { subject, html, text };
 }

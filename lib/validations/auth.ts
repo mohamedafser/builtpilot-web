@@ -58,6 +58,26 @@ export const resendSignupSchema = z.object({
   email: emailSchema,
 });
 
+export const resendPasswordResetSchema = z.object({
+  email: emailSchema,
+});
+
+export const verifySignupOtpSchema = z.object({
+  email: emailSchema,
+  token: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit verification code."),
+});
+
+export const verifyPasswordResetOtpSchema = z.object({
+  email: emailSchema,
+  token: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit verification code."),
+});
+
 export const resetPasswordSchema = z
   .object({
     password: passwordSchema,
@@ -78,6 +98,13 @@ export type LoginValues = z.infer<typeof loginSchema>;
 export type SignupValues = z.infer<typeof signupSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResendSignupValues = z.infer<typeof resendSignupSchema>;
+export type ResendPasswordResetValues = z.infer<
+  typeof resendPasswordResetSchema
+>;
+export type VerifySignupOtpValues = z.infer<typeof verifySignupOtpSchema>;
+export type VerifyPasswordResetOtpValues = z.infer<
+  typeof verifyPasswordResetOtpSchema
+>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type WorkspacePreferencesValues = z.infer<
   typeof workspacePreferencesSchema

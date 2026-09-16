@@ -11,10 +11,16 @@ import {
 } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+type ForgotPasswordResponse = {
+  redirectTo?: string;
+};
+
 export function ForgotPasswordForm() {
+  const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const {
@@ -32,7 +38,7 @@ export function ForgotPasswordForm() {
     setFormError(null);
     setSuccessMessage(null);
 
-    const result = await requestJson<Record<string, never>>(
+    const result = await requestJson<ForgotPasswordResponse>(
       "/api/auth/forgot-password",
       {
         method: "POST",
@@ -43,6 +49,12 @@ export function ForgotPasswordForm() {
 
     if (!result.ok) {
       setFormError(result.message);
+      return;
+    }
+
+    if (result.data.redirectTo) {
+      router.push(result.data.redirectTo);
+      router.refresh();
       return;
     }
 
@@ -80,7 +92,7 @@ export function ForgotPasswordForm() {
         disabled={isSubmitting}
         icon={Mail}
       >
-        {isSubmitting ? "Sending reset link..." : "Send reset link"}
+        {isSubmitting ? "Sending code..." : "Send verification code"}
       </Button>
     </form>
   );

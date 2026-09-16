@@ -42,7 +42,6 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/ai") ||
@@ -60,7 +59,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isAuthPage) {
+  // Allow pending verification without a session.
+  if (user && (pathname === "/login" || pathname === "/signup")) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && pathname === "/verify-email") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Recovery flow: keep users on reset-password instead of bouncing to dashboard.
+  if (
+    user &&
+    (pathname === "/forgot-password" || pathname === "/verify-reset") &&
+    !request.cookies.get("bp_password_recovery")
+  ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";

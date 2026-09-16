@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthPanel
       title="Reset your password"
-      description="Enter your account email and we will send a reset link if it exists."
+      description="Enter your account email and we will send a 6-digit verification code if it exists."
       footer={
         <p className="text-center text-sm text-stone-500">
           Remembered your password?{" "}

@@ -175,6 +175,6 @@ export async function sendEmail(
   return {
     ok: false,
     error:
-      "Quotation email is not configured. Signup emails are sent by Supabase automatically. Quotation emails need Gmail SMTP in .env.local: SMTP_HOST, SMTP_USER, and SMTP_PASS.",
+      "Email is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env.local.",
   };
 }

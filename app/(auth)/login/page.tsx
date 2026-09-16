@@ -11,7 +11,12 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string; reset?: string }>;
+  searchParams: Promise<{
+    next?: string;
+    error?: string;
+    reset?: string;
+    verified?: string;
+  }>;
 }) {
   const params = await searchParams;
 
@@ -34,6 +39,11 @@ export default async function LoginPage({
       {params.reset === "success" ? (
         <Alert variant="success" className="mb-4">
           Your password was updated. Sign in with your new password.
+        </Alert>
+      ) : null}
+      {params.verified === "1" ? (
+        <Alert variant="success" className="mb-4">
+          Email verified successfully. Please sign in to continue.
         </Alert>
       ) : null}
       {params.error ? (

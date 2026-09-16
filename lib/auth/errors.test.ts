@@ -41,6 +41,24 @@ describe("getAuthErrorMessage", () => {
         { message: "Email rate limit exceeded", status: 429 },
         "signup-resend",
       ),
+      AUTH_MESSAGES.emailSendRateLimited,
+    );
+    assert.equal(
+      getAuthErrorMessage(
+        {
+          message: "email rate limit exceeded",
+          code: "over_email_send_rate_limit",
+          status: 429,
+        },
+        "signup",
+      ),
+      AUTH_MESSAGES.emailSendRateLimited,
+    );
+    assert.equal(
+      getAuthErrorMessage(
+        { message: "Too many requests", code: "over_request_rate_limit", status: 429 },
+        "login",
+      ),
       AUTH_MESSAGES.rateLimited,
     );
   });

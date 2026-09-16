@@ -8,10 +8,6 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { requestJson } from "@/lib/api/client";
 import {
-  AUTH_MESSAGES,
-  SIGNUP_RESEND_COOLDOWN_SECONDS,
-} from "@/lib/auth/constants";
-import {
   currencyForCountry,
   detectCountryFromBrowser,
   LANGUAGE_LABELS,
@@ -25,43 +21,22 @@ import {
   type SignupValues,
 } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail, UserPlus } from "lucide-react";
-import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-
-function formatCountdown(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
 
 type SignupResponse = {
   email: string;
+  expiresAt?: number;
   retryAfterSeconds?: number;
   redirectTo?: string;
+  needsVerification?: boolean;
 };
 
-type ResendResponse = {
-  email: string;
-  retryAfterSeconds: number;
-};
-
-export function SignupForm({
-  onAwaitingConfirmationChange,
-}: {
-  onAwaitingConfirmationChange?: (awaiting: boolean) => void;
-} = {}) {
+export function SignupForm() {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [resendError, setResendError] = useState<string | null>(null);
-  const [isResending, startResendTransition] = useTransition();
   const {
     register,
     handleSubmit,
@@ -89,27 +64,8 @@ export function SignupForm({
     setValue("country_code", detected);
   }, [setValue]);
 
-  useEffect(() => {
-    onAwaitingConfirmationChange?.(Boolean(successMessage && pendingEmail));
-  }, [successMessage, pendingEmail, onAwaitingConfirmationChange]);
-
-  useEffect(() => {
-    if (cooldownSeconds <= 0) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setCooldownSeconds((current) => Math.max(0, current - 1));
-    }, 1000);
-
-    return () => window.clearTimeout(timer);
-  }, [cooldownSeconds]);
-
   async function onSubmit(values: SignupValues) {
     setFormError(null);
-    setSuccessMessage(null);
-    setResendError(null);
-    setCooldownSeconds(0);
 
     const result = await requestJson<SignupResponse>("/api/auth/signup", {
       method: "POST",
@@ -122,112 +78,12 @@ export function SignupForm({
       return;
     }
 
-    if (result.data.redirectTo) {
-      router.push(result.data.redirectTo);
-      router.refresh();
-      return;
-    }
-
-    // Timer starts only after signup succeeds and confirmation email is sent.
-    setPendingEmail(result.data.email || values.email);
-    setSuccessMessage(result.message);
-    setCooldownSeconds(
-      result.data.retryAfterSeconds ?? SIGNUP_RESEND_COOLDOWN_SECONDS,
-    );
-  }
-
-  function onResend() {
-    if (!pendingEmail || cooldownSeconds > 0) {
-      return;
-    }
-
-    setResendError(null);
-    startResendTransition(async () => {
-      const result = await requestJson<ResendResponse>(
-        "/api/auth/resend-signup",
-        {
-          method: "POST",
-          body: JSON.stringify({ email: pendingEmail }),
-          notify: false,
-        },
-      );
-
-      if (!result.ok) {
-        setResendError(result.message);
-        if (result.message === AUTH_MESSAGES.rateLimited) {
-          setCooldownSeconds(SIGNUP_RESEND_COOLDOWN_SECONDS);
-        }
-        return;
-      }
-
-      setSuccessMessage(result.message);
-      setCooldownSeconds(
-        result.data.retryAfterSeconds ?? SIGNUP_RESEND_COOLDOWN_SECONDS,
-      );
-    });
-  }
-
-  if (successMessage && pendingEmail) {
-    const canResend = cooldownSeconds <= 0;
-
-    return (
-      <div className="space-y-4">
-        <Alert variant="success">
-          <p className="font-medium">{successMessage}</p>
-          <p className="mt-1 text-emerald-700/90">
-            We sent a confirmation link to{" "}
-            <span className="font-medium">{pendingEmail}</span>.
-          </p>
-        </Alert>
-
-        {resendError ? <Alert variant="error">{resendError}</Alert> : null}
-
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-sm text-stone-600">
-          {canResend ? (
-            <p>
-              Didn&apos;t get the email? You can resend the confirmation link.
-            </p>
-          ) : (
-            <p>
-              You can resend the confirmation email in{" "}
-              <span className="font-semibold text-stone-800">
-                {formatCountdown(cooldownSeconds)}
-              </span>
-              .
-            </p>
-          )}
-        </div>
-
-        <Button
-          type="button"
-          size="lg"
-          fullWidth
-          variant={canResend ? "primary" : "secondary"}
-          disabled={!canResend || isResending}
-          icon={Mail}
-          onClick={onResend}
-        >
-          {isResending
-            ? "Sending..."
-            : canResend
-              ? "Resend confirmation email"
-              : `Resend available in ${formatCountdown(cooldownSeconds)}`}
-        </Button>
-      </div>
-    );
+    router.push(result.data.redirectTo || "/verify-email");
+    router.refresh();
   }
 
   return (
-    <form
-      noValidate
-      className="space-y-5"
-      onSubmit={(event) => {
-        // Always block native POST to /signup — Next.js treats those as
-        // Server Actions and throws UnrecognizedActionError.
-        event.preventDefault();
-        void handleSubmit(onSubmit)(event);
-      }}
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {formError ? <Alert variant="error">{formError}</Alert> : null}
 
       <div className="grid gap-5 sm:grid-cols-2">

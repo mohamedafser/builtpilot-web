@@ -15,7 +15,11 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 type LoginResponse = {
-  redirectTo: string;
+  redirectTo?: string;
+  needsVerification?: boolean;
+  email?: string;
+  expiresAt?: number;
+  retryAfterSeconds?: number;
 };
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
@@ -46,19 +50,18 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       return;
     }
 
-    router.push(result.data.redirectTo);
+    if (result.data.needsVerification) {
+      router.push(result.data.redirectTo || "/verify-email");
+      router.refresh();
+      return;
+    }
+
+    router.push(result.data.redirectTo || "/dashboard");
     router.refresh();
   }
 
   return (
-    <form
-      noValidate
-      className="space-y-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void handleSubmit(onSubmit)(event);
-      }}
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {formError ? <Alert variant="error">{formError}</Alert> : null}
 
       <div>

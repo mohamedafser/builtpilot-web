@@ -1,6 +1,6 @@
 import { apiError } from "@/lib/api/response";
 import { toAuthResponse } from "@/lib/auth/http";
-import { performLogin } from "@/lib/auth/service";
+import { performLogin, resolveAuthOrigin } from "@/lib/auth/service";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
   const { next, ...credentials } = payload;
 
   return toAuthResponse(
-    await performLogin(credentials, typeof next === "string" ? next : null),
+    await performLogin(
+      credentials,
+      typeof next === "string" ? next : null,
+      resolveAuthOrigin(request),
+    ),
   );
 }

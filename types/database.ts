@@ -175,6 +175,42 @@ export type Database = {
           },
         ];
       };
+      email_otps: {
+        Row: {
+          id: string;
+          user_id: string;
+          email: string;
+          code_hash: string;
+          expires_at: string;
+          attempts: number;
+          consumed_at: string | null;
+          created_at: string;
+          purpose: "signup" | "password_reset";
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          email: string;
+          code_hash: string;
+          expires_at: string;
+          attempts?: number;
+          consumed_at?: string | null;
+          created_at?: string;
+          purpose?: "signup" | "password_reset";
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          email?: string;
+          code_hash?: string;
+          expires_at?: string;
+          attempts?: number;
+          consumed_at?: string | null;
+          created_at?: string;
+          purpose?: "signup" | "password_reset";
+        };
+        Relationships: [];
+      };
       businesses: {
         Row: {
           id: string;

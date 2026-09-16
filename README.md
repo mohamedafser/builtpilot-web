@@ -143,16 +143,34 @@ For local-only development, you can temporarily use Site URL `http://localhost:3
 
 Password reset emails use the same callback route and then send the user to `/reset-password`.
 
-### Confirm signup email template
+### Signup email verification (SMTP OTP)
 
-Paste `supabase/templates/confirm-signup.html` into
-**Authentication → Email Templates → Confirm signup**.
+Signup verification codes are sent by BuildPilot via your configured SMTP
+(`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`) — not by Supabase Auth emails.
 
-Subject:
+1. Apply the migration:
 
-```text
-Confirm your BuildPilot account
+```bash
+npx supabase db push
 ```
+
+Or run `supabase/migrations/20260316110000_email_otps.sql` in the SQL editor.
+
+2. Ensure `.env.local` has:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-gmail-app-password
+EMAIL_FROM=BuildPilot <you@gmail.com>
+```
+
+3. Keep **Confirm email** enabled in Supabase so unverified users cannot sign in
+   until OTP verification marks `email_confirm` true.
+
+Users verify at `/verify-email` with the 6-digit code from the SMTP email.
 
 ### 6. Start the app
 

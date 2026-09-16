@@ -158,6 +158,109 @@ body {
   animation: ai-glow 6s ease-in-out infinite;
 }
 
+@keyframes landing-orbit {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes landing-orbit-alt {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+}
+
+@keyframes landing-ring-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes landing-stat-pulse {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px);
+    opacity: 0.92;
+  }
+}
+
+@keyframes landing-pwa-pulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 20px -10px rgba(234, 88, 12, 0.8);
+  }
+  50% {
+    box-shadow: 0 10px 24px -8px rgba(234, 88, 12, 1);
+  }
+}
+
+.landing-orbit-icon {
+  animation: landing-orbit 5.5s ease-in-out infinite;
+}
+
+.landing-orbit-1 {
+  animation-delay: 0s;
+}
+
+.landing-orbit-2 {
+  animation-delay: 0.8s;
+}
+
+.landing-orbit-3 {
+  animation-delay: 1.6s;
+}
+
+.landing-orbit-4 {
+  animation-delay: 2.4s;
+}
+
+.landing-showcase-glow {
+  animation: ai-glow 5s ease-in-out infinite;
+}
+
+.landing-showcase-ring {
+  animation: landing-ring-spin 36s linear infinite;
+}
+
+.landing-showcase-ring-reverse {
+  animation: landing-ring-spin 48s linear infinite reverse;
+}
+
+.landing-showcase-stat {
+  animation: landing-stat-pulse 4s ease-in-out infinite;
+}
+
+.landing-showcase-stat-delay-1 {
+  animation-delay: 0.6s;
+}
+
+.landing-showcase-stat-delay-2 {
+  animation-delay: 1.2s;
+}
+
+.landing-feature-icon {
+  animation: landing-orbit-alt 6s ease-in-out infinite;
+}
+
+.landing-pwa-pulse {
+  animation: landing-pwa-pulse 2.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-fade-up,
   .landing-fade-in,
@@ -166,7 +269,14 @@ body {
   .landing-ai-panel,
   .landing-ai-card,
   .landing-ai-message,
-  .landing-ai-glow {
+  .landing-ai-glow,
+  .landing-orbit-icon,
+  .landing-showcase-glow,
+  .landing-showcase-ring,
+  .landing-showcase-ring-reverse,
+  .landing-showcase-stat,
+  .landing-feature-icon,
+  .landing-pwa-pulse {
     animation: none;
   }
 }
