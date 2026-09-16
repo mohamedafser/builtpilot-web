@@ -30,6 +30,13 @@ export type MaterialListItem = Material & {
   current_stock: string;
   stock_status: StockStatus;
   vendor_name: string | null;
+  total_adjusted_increase: string;
+  total_adjusted_decrease: string;
+  last_adjustment: {
+    direction: AdjustmentDirection;
+    quantity: string;
+    date: string;
+  } | null;
 };
 
 export type MaterialProjectUsage = {
@@ -72,6 +79,13 @@ export type ProjectMaterialRow = {
   total_received: string;
   total_used: string;
   total_returned: string;
+  total_adjusted_increase: string;
+  total_adjusted_decrease: string;
+  last_adjustment: {
+    direction: AdjustmentDirection;
+    quantity: string;
+    date: string;
+  } | null;
   latest_unit_price: string | null;
   vendor_name: string | null;
   stock_status: StockStatus;

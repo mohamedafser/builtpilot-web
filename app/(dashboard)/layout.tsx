@@ -6,6 +6,7 @@ import {
   DEFAULT_LANGUAGE,
 } from "@/lib/i18n/config";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
+import { PermissionsProvider } from "@/lib/permissions/permissions-context";
 import type { ReactNode } from "react";
 
 export default async function DashboardGroupLayout({
@@ -19,7 +20,7 @@ export default async function DashboardGroupLayout({
     return <DatabaseSetupRequired />;
   }
 
-  const { user, profile, business } = await getWorkspaceContext();
+  const { user, profile, business, role } = await getWorkspaceContext();
   const displayName = profile?.full_name ?? user.email ?? "there";
 
   return (
@@ -28,9 +29,16 @@ export default async function DashboardGroupLayout({
       currencyCode={business?.currency_code ?? DEFAULT_CURRENCY}
       countryCode={business?.country_code ?? "IN"}
     >
-      <DashboardShell businessName={business?.name} userName={displayName}>
-        {children}
-      </DashboardShell>
+      <PermissionsProvider role={role}>
+        <DashboardShell
+          businessName={business?.name}
+          userName={displayName}
+          role={role}
+          userId={user.id}
+        >
+          {children}
+        </DashboardShell>
+      </PermissionsProvider>
     </LocaleProvider>
   );
 }

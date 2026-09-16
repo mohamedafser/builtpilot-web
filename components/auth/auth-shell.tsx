@@ -1,4 +1,9 @@
+"use client";
+
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { Logo } from "@/components/layout/logo";
+import { useLocale } from "@/lib/i18n/locale-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import { Bricolage_Grotesque } from "next/font/google";
 import Link from "next/link";
@@ -9,13 +14,15 @@ const display = Bricolage_Grotesque({
   variable: "--font-auth-display",
 });
 
-const highlights = [
-  "Projects, labour, materials, and cost in one workspace",
-  "Quotations, BOQ, and estimate vs actual",
-  "Client portal, WhatsApp updates, and BuildPilot AI",
+const highlightKeys: MessageKey[] = [
+  "auth.shellHighlight1",
+  "auth.shellHighlight2",
+  "auth.shellHighlight3",
 ];
 
 export function AuthShell({ children }: { children: ReactNode }) {
+  const { t } = useLocale();
+
   return (
     <div
       className={cn(
@@ -57,23 +64,22 @@ export function AuthShell({ children }: { children: ReactNode }) {
                 "font-[family-name:var(--font-auth-display)] text-4xl leading-tight font-semibold tracking-tight text-white xl:text-5xl",
               )}
             >
-              Run every job from site to client handoff.
+              {t("auth.shellHeadline")}
             </p>
             <p className="mt-4 text-base leading-7 text-stone-300">
-              BuildPilot helps civil engineers and small contractors track work,
-              cost, and client updates—built for India and the UAE.
+              {t("auth.shellBody")}
             </p>
             <ul className="mt-8 space-y-3">
-              {highlights.map((item) => (
+              {highlightKeys.map((key) => (
                 <li
-                  key={item}
+                  key={key}
                   className="flex items-start gap-3 text-sm leading-6 text-stone-200"
                 >
                   <span
                     aria-hidden
                     className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
                   />
-                  <span>{item}</span>
+                  <span>{t(key)}</span>
                 </li>
               ))}
             </ul>
@@ -85,14 +91,19 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </aside>
 
         <section className="flex flex-col px-4 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-          <div className="mb-8 flex items-center justify-between lg:hidden">
-            <Logo href="/" />
-            <Link
-              href="/"
-              className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-900"
-            >
-              Home
-            </Link>
+          <div className="mb-8 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 lg:hidden">
+              <Logo href="/" />
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <LanguageSwitcher />
+              <Link
+                href="/"
+                className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-900 lg:hidden"
+              >
+                Home
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-1 items-center justify-center">

@@ -32,7 +32,9 @@ import {
   type TemplateCostLine,
   type TemplateFloorRate,
   type TemplateListItem,
+  toSqFt,
 } from "@/lib/quotation-templates";
+import { roundArea } from "@/lib/quotation-templates/units";
 import {
   AREA_BASIS_LABELS,
   AREA_BASIS_OPTIONS,
@@ -58,10 +60,110 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FocusEvent,
+  type InputHTMLAttributes,
+} from "react";
 
 function newId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+type ClearableNumberInputProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value" | "onChange"
+> & {
+  value: number | "" | null | undefined;
+  onValueChange: (value: number) => void;
+  /** Committed value when the field is cleared (default 0). */
+  emptyValue?: number;
+};
+
+/** Number input that can be fully cleared while editing instead of snapping to 0. */
+function ClearableNumberInput({
+  value,
+  onValueChange,
+  emptyValue = 0,
+  min,
+  max,
+  onBlur,
+  onFocus,
+  ...props
+}: ClearableNumberInputProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const minValue = min == null || min === "" ? undefined : Number(min);
+  const maxValue = max == null || max === "" ? undefined : Number(max);
+
+  const display =
+    draft !== null
+      ? draft
+      : value === "" || value == null
+        ? ""
+        : String(value);
+
+  function clamp(next: number) {
+    let result = next;
+    if (Number.isFinite(minValue)) {
+      result = Math.max(minValue as number, result);
+    }
+    if (Number.isFinite(maxValue)) {
+      result = Math.min(maxValue as number, result);
+    }
+    return result;
+  }
+
+  function commitRaw(raw: string) {
+    if (raw.trim() === "") {
+      onValueChange(
+        clamp(Number.isFinite(emptyValue) ? emptyValue : 0),
+      );
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    onValueChange(clamp(parsed));
+  }
+
+  return (
+    <Input
+      type="number"
+      value={display}
+      min={min}
+      max={max}
+      onFocus={(event: FocusEvent<HTMLInputElement>) => {
+        setDraft(value === "" || value == null ? "" : String(value));
+        onFocus?.(event);
+      }}
+      onChange={(event) => {
+        const raw = event.target.value;
+        setDraft(raw);
+        // Keep empty while typing; commit emptyValue on blur so fields stay clearable.
+        if (raw.trim() === "") {
+          return;
+        }
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          return;
+        }
+        onValueChange(clamp(parsed));
+      }}
+      onBlur={(event: FocusEvent<HTMLInputElement>) => {
+        if (draft !== null) {
+          commitRaw(draft);
+        }
+        setDraft(null);
+        onBlur?.(event);
+      }}
+      {...props}
+    />
+  );
 }
 
 function CostLineEditor({
@@ -77,15 +179,30 @@ function CostLineEditor({
   modified?: boolean;
   currencyCode: string;
 }) {
+  const { t, tParams } = useLocale();
+  const sectionTotal = useMemo(
+    () =>
+      lines.reduce(
+        (sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0),
+        0,
+      ),
+    [lines],
+  );
+
   return (
     <CompactPanel
       title={title}
       action={
-        modified ? (
-          <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-            Modified
+        <div className="flex items-center gap-2">
+          {modified ? (
+            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+              Modified
+            </span>
+          ) : null}
+          <span className="rounded-md bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-800">
+            {t("common.total")} {formatLabourCost(sectionTotal, currencyCode)}
           </span>
-        ) : null
+        </div>
       }
     >
       <div className="overflow-x-auto">
@@ -126,35 +243,27 @@ function CostLineEditor({
                   />
                 </td>
                 <td className="py-1.5 pr-2">
-                  <Input
-                    type="number"
-                    min="0"
+                  <ClearableNumberInput
+                    min={0}
                     step="0.001"
                     className="h-8 w-20 text-xs"
                     value={line.quantity}
-                    onChange={(event) => {
+                    onValueChange={(quantity) => {
                       const next = [...lines];
-                      next[index] = {
-                        ...line,
-                        quantity: Math.max(0, Number(event.target.value) || 0),
-                      };
+                      next[index] = { ...line, quantity };
                       onChange(next);
                     }}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
-                  <Input
-                    type="number"
-                    min="0"
+                  <ClearableNumberInput
+                    min={0}
                     step="0.01"
                     className="h-8 w-24 text-xs"
                     value={line.unitPrice}
-                    onChange={(event) => {
+                    onValueChange={(unitPrice) => {
                       const next = [...lines];
-                      next[index] = {
-                        ...line,
-                        unitPrice: Math.max(0, Number(event.target.value) || 0),
-                      };
+                      next[index] = { ...line, unitPrice };
                       onChange(next);
                     }}
                   />
@@ -177,8 +286,27 @@ function CostLineEditor({
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr className="border-t border-stone-200">
+              <td
+                colSpan={4}
+                className="pt-2 pr-2 text-right text-xs font-semibold text-stone-700"
+              >
+                {tParams("estimate.sectionTotal", { section: title })}
+              </td>
+              <td className="pt-2 pr-2 text-xs font-semibold tabular-nums text-stone-900">
+                {formatLabourCost(sectionTotal, currencyCode)}
+              </td>
+              <td className="pt-2" />
+            </tr>
+          </tfoot>
         </table>
       </div>
+      {lines.length === 0 ? (
+        <p className="mb-2 text-xs text-stone-500">
+          {t("estimate.noItems")}
+        </p>
+      ) : null}
       <Button
         variant="secondary"
         size="sm"
@@ -198,7 +326,7 @@ function CostLineEditor({
           ])
         }
       >
-        Add item
+        {t("estimate.addItem")}
       </Button>
     </CompactPanel>
   );
@@ -280,7 +408,7 @@ export function QuotationEstimateScreen({
   mode?: "template" | "blank";
 }) {
   const router = useRouter();
-  const { currencyCode: workspaceCurrency } = useLocale();
+  const { currencyCode: workspaceCurrency, t, tParams } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [summaries, setSummaries] = useState<QuotationTemplateSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -512,7 +640,39 @@ export function QuotationEstimateScreen({
       }
       return next;
     });
-  }, [baseline, floorCount, qualityId, sharedBuiltUpSqFt]);
+    // sharedBuiltUpSqFt is applied via plot/shared handlers so per-floor edits are kept
+    // when only floor count / quality changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseline, floorCount, qualityId]);
+
+  function syncBuiltUpAcrossFloors(builtUpSqFt: number) {
+    const area = roundArea(Math.max(0, builtUpSqFt));
+    setSharedBuiltUpSqFt(area);
+    setFloorAreas((current) => {
+      if (current.length === 0) {
+        return [{ floor: 0, builtUpSqFt: area }];
+      }
+      return current.map((row) => ({ ...row, builtUpSqFt: area }));
+    });
+  }
+
+  function builtUpFromPlotArea(value: number, unit: PlotAreaUnit) {
+    return roundArea(toSqFt(Math.max(0, value), unit));
+  }
+
+  function onPlotAreaValueChange(value: number) {
+    setPlotAreaValue(value);
+    syncBuiltUpAcrossFloors(builtUpFromPlotArea(value, plotAreaUnit));
+  }
+
+  function onPlotAreaUnitChange(unit: PlotAreaUnit) {
+    setPlotAreaUnit(unit);
+    syncBuiltUpAcrossFloors(builtUpFromPlotArea(plotAreaValue, unit));
+  }
+
+  function onSharedBuiltUpChange(value: number) {
+    syncBuiltUpAcrossFloors(value);
+  }
 
   const estimate = useMemo(() => {
     if (!baseline) return null;
@@ -567,6 +727,22 @@ export function QuotationEstimateScreen({
       return !current || current.ratePerSqFt !== rate.ratePerSqFt;
     });
   }, [baseline, floorCount, floorRates, qualityId]);
+
+  const addonsSectionTotal = useMemo(
+    () =>
+      addons.reduce((sum, addon) => {
+        if (!addon.selected) {
+          return sum;
+        }
+        const amount = Number(addon.amount || 0);
+        const rate = Number(addon.ratePerSqFt || 0);
+        if (rate > 0 && estimate?.totalBuiltUpArea) {
+          return sum + rate * estimate.totalBuiltUpArea;
+        }
+        return sum + amount;
+      }, 0),
+    [addons, estimate?.totalBuiltUpArea],
+  );
 
   function saveQuotation() {
     if (!baseline || !estimate) return;
@@ -864,21 +1040,18 @@ export function QuotationEstimateScreen({
               Plot area
             </label>
             <div className="flex gap-1.5">
-              <Input
-                type="number"
-                min="0"
+              <ClearableNumberInput
+                min={0}
                 step="0.001"
                 className="h-9"
                 value={plotAreaValue}
-                onChange={(event) =>
-                  setPlotAreaValue(Math.max(0, Number(event.target.value) || 0))
-                }
+                onValueChange={onPlotAreaValueChange}
               />
               <Select
                 className="h-9 w-24"
                 value={plotAreaUnit}
                 onChange={(event) =>
-                  setPlotAreaUnit(event.target.value as PlotAreaUnit)
+                  onPlotAreaUnitChange(event.target.value as PlotAreaUnit)
                 }
               >
                 {PLOT_AREA_UNITS.map((unit) => (
@@ -896,34 +1069,28 @@ export function QuotationEstimateScreen({
             <label className="mb-1 block text-[11px] font-medium text-stone-500">
               Built-up / floor (sq.ft)
             </label>
-            <Input
-              type="number"
-              min="0"
+            <ClearableNumberInput
+              min={0}
               step="0.001"
               className="h-9"
               value={sharedBuiltUpSqFt}
-              onChange={(event) =>
-                setSharedBuiltUpSqFt(
-                  Math.max(0, Number(event.target.value) || 0),
-                )
-              }
+              onValueChange={onSharedBuiltUpChange}
             />
+            <p className="mt-1 text-[11px] text-stone-500">
+              Auto-filled from plot area; edit to override per floor.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-medium text-stone-500">
               Floors
             </label>
-            <Input
-              type="number"
-              min="1"
-              max="20"
+            <ClearableNumberInput
+              min={1}
+              max={20}
+              emptyValue={1}
               className="h-9"
               value={floorCount}
-              onChange={(event) =>
-                setFloorCount(
-                  Math.min(20, Math.max(1, Number(event.target.value) || 1)),
-                )
-              }
+              onValueChange={setFloorCount}
             />
           </div>
         </div>
@@ -951,32 +1118,29 @@ export function QuotationEstimateScreen({
                   setFloorRates(next);
                 }}
               />
-              <Input
-                type="number"
-                min="0"
+              <ClearableNumberInput
+                min={0}
                 className="h-8 text-xs"
                 value={rate.ratePerSqFt}
-                onChange={(event) => {
+                onValueChange={(ratePerSqFt) => {
                   const next = [...floorRates];
-                  next[index] = {
-                    ...rate,
-                    ratePerSqFt: Math.max(0, Number(event.target.value) || 0),
-                  };
+                  next[index] = { ...rate, ratePerSqFt };
                   setFloorRates(next);
                 }}
               />
-              <Input
-                type="number"
-                min="0"
+              <ClearableNumberInput
+                min={0}
                 className="h-8 text-xs"
-                value={floorAreas.find((row) => row.floor === rate.floor)?.builtUpSqFt ?? ""}
+                value={
+                  floorAreas.find((row) => row.floor === rate.floor)
+                    ?.builtUpSqFt ?? ""
+                }
                 placeholder="Floor sq.ft"
-                onChange={(event) => {
-                  const value = Math.max(0, Number(event.target.value) || 0);
+                onValueChange={(builtUpSqFt) => {
                   setFloorAreas((current) =>
                     current.map((row) =>
                       row.floor === rate.floor
-                        ? { ...row, builtUpSqFt: value }
+                        ? { ...row, builtUpSqFt }
                         : row,
                     ),
                   );
@@ -1098,74 +1262,69 @@ export function QuotationEstimateScreen({
           <label className="mb-1 block text-[11px] font-medium text-stone-500">
             Tax %
           </label>
-          <Input
-            type="number"
-            min="0"
+          <ClearableNumberInput
+            min={0}
             className="h-9"
             value={taxPercentage}
-            onChange={(event) =>
-              setTaxPercentage(Math.max(0, Number(event.target.value) || 0))
-            }
+            onValueChange={setTaxPercentage}
           />
         </div>
         <div>
           <label className="mb-1 block text-[11px] font-medium text-stone-500">
             Contingency %
           </label>
-          <Input
-            type="number"
-            min="0"
+          <ClearableNumberInput
+            min={0}
             className="h-9"
             value={contingencyPercentage}
-            onChange={(event) =>
-              setContingencyPercentage(
-                Math.max(0, Number(event.target.value) || 0),
-              )
-            }
+            onValueChange={setContingencyPercentage}
           />
         </div>
         <div>
           <label className="mb-1 block text-[11px] font-medium text-stone-500">
             Discount %
           </label>
-          <Input
-            type="number"
-            min="0"
-            max="100"
+          <ClearableNumberInput
+            min={0}
+            max={100}
             className="h-9"
             value={discountPercentage}
-            onChange={(event) =>
-              setDiscountPercentage(
-                Math.min(100, Math.max(0, Number(event.target.value) || 0)),
-              )
-            }
+            onValueChange={setDiscountPercentage}
           />
         </div>
       </div>
 
       <CostLineEditor
-        title="Materials"
+        title={t("estimate.materials")}
         lines={materials}
         onChange={setMaterials}
         currencyCode={currencyCode}
       />
       <CostLineEditor
-        title="Labour"
+        title={t("estimate.labour")}
         lines={labour}
         onChange={setLabour}
         currencyCode={currencyCode}
       />
       <CostLineEditor
-        title="Other costs"
+        title={t("estimate.otherCosts")}
         lines={otherCosts}
         onChange={setOtherCosts}
         currencyCode={currencyCode}
       />
 
-      <CompactPanel title="Optional add-ons">
+      <CompactPanel
+        title={t("estimate.addons")}
+        action={
+          <span className="rounded-md bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-800">
+            {t("common.total")}{" "}
+            {formatLabourCost(addonsSectionTotal, currencyCode)}
+          </span>
+        }
+      >
         {addons.length === 0 ? (
           <p className="mb-2 text-xs text-stone-500">
-            No add-ons yet. Add optional extras such as compound wall or sump.
+            {t("estimate.noAddons")}
           </p>
         ) : null}
         <ul className="space-y-2">
@@ -1192,20 +1351,27 @@ export function QuotationEstimateScreen({
                   setAddons(next);
                 }}
               />
-              <Input
-                type="number"
-                min="0"
+              <ClearableNumberInput
+                min={0}
                 className="h-8 w-28 text-xs"
                 value={addon.amount}
-                onChange={(event) => {
+                onValueChange={(amount) => {
                   const next = [...addons];
-                  next[index] = {
-                    ...addon,
-                    amount: Math.max(0, Number(event.target.value) || 0),
-                  };
+                  next[index] = { ...addon, amount };
                   setAddons(next);
                 }}
               />
+              <span className="min-w-[4.5rem] text-right text-xs tabular-nums text-stone-600">
+                {addon.selected
+                  ? formatLabourCost(
+                      Number(addon.ratePerSqFt || 0) > 0 &&
+                        estimate?.totalBuiltUpArea
+                        ? Number(addon.ratePerSqFt) * estimate.totalBuiltUpArea
+                        : Number(addon.amount || 0),
+                      currencyCode,
+                    )
+                  : "—"}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1219,6 +1385,18 @@ export function QuotationEstimateScreen({
             </li>
           ))}
         </ul>
+        {addons.length > 0 ? (
+          <div className="mt-2 flex items-center justify-between border-t border-stone-100 pt-2 text-xs">
+            <span className="font-semibold text-stone-700">
+              {tParams("estimate.sectionTotal", {
+                section: t("estimate.addons"),
+              })}
+            </span>
+            <span className="font-semibold tabular-nums text-stone-900">
+              {formatLabourCost(addonsSectionTotal, currencyCode)}
+            </span>
+          </div>
+        ) : null}
         <Button
           variant="secondary"
           size="sm"
@@ -1236,7 +1414,7 @@ export function QuotationEstimateScreen({
             ])
           }
         >
-          Add add-on
+          {t("estimate.addAddon")}
         </Button>
       </CompactPanel>
 

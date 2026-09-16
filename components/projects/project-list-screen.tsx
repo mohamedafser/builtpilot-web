@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import { ProjectList } from "@/components/projects/project-list";
 import { ProjectListSkeleton } from "@/components/projects/project-list-skeleton";
 import { Alert } from "@/components/ui/alert";
@@ -14,6 +15,7 @@ import {
   writeApiCache,
 } from "@/lib/api/client-cache";
 import { WithIcon } from "@/components/ui/with-icon";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 import { FolderKanban, FilterX, Plus } from "lucide-react";
 import Link from "next/link";
@@ -54,6 +56,7 @@ function buildProjectsUrl(input: {
 }
 
 export function ProjectListScreen() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -122,7 +125,7 @@ export function ProjectListScreen() {
   }
 
   if (error) {
-    return <Alert variant="error">{error}</Alert>;
+    return <Alert variant="error">{t("projects.loadError")}</Alert>;
   }
 
   const projects = result?.projects ?? [];
@@ -140,14 +143,14 @@ export function ProjectListScreen() {
             ? "No archived projects"
             : hasActiveFilters
               ? "No matching projects"
-              : "No projects yet"
+              : t("projects.empty")
         }
         description={
           archived
             ? "Archived jobs will appear here when you move them out of the active list."
             : hasActiveFilters
               ? "Try a different search or status filter."
-              : "Create your first construction project to get started."
+              : t("projects.emptyHint")
         }
         action={
           archived || hasActiveFilters ? (
@@ -155,12 +158,14 @@ export function ProjectListScreen() {
               href="/projects"
               className={cn(linkButtonClassName("secondary"))}
             >
-              <WithIcon icon={FilterX}>Clear filters</WithIcon>
+              <WithIcon icon={FilterX}>{t("common.clearFilters")}</WithIcon>
             </Link>
           ) : (
-            <Link href="/projects/new" className={cn(linkButtonClassName())}>
-              <WithIcon icon={Plus}>Create Project</WithIcon>
-            </Link>
+            <Can permission="projects.create">
+              <Link href="/projects/new" className={cn(linkButtonClassName())}>
+                <WithIcon icon={Plus}>{t("projects.new")}</WithIcon>
+              </Link>
+            </Can>
           )
         }
       />

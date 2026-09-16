@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import { ProjectList } from "@/components/projects/project-list";
 import { ProjectListSkeleton } from "@/components/projects/project-list-skeleton";
 import { Alert } from "@/components/ui/alert";
@@ -68,9 +69,11 @@ export function ProjectListLoader() {
               <WithIcon icon={FilterX}>Clear filters</WithIcon>
             </Link>
           ) : (
-            <Link href="/projects/new" className={cn(linkButtonClassName())}>
-              <WithIcon icon={Plus}>Create Project</WithIcon>
-            </Link>
+            <Can permission="projects.create">
+              <Link href="/projects/new" className={cn(linkButtonClassName())}>
+                <WithIcon icon={Plus}>Create Project</WithIcon>
+              </Link>
+            </Can>
           )
         }
       />

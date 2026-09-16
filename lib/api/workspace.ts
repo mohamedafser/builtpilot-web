@@ -1,4 +1,9 @@
 import { getCurrentMembership, getCurrentUser } from "@/lib/auth";
+import {
+  hasPermission,
+  type OrganizationRole,
+  type Permission,
+} from "@/lib/permissions";
 import type { Business, UserRole } from "@/types";
 import type { User } from "@supabase/supabase-js";
 
@@ -31,5 +36,30 @@ export async function getApiWorkspace(): Promise<
     user,
     business: membership.business,
     role: membership.role,
+  };
+}
+
+export async function requireApiPermission(permission: Permission): Promise<
+  | { ok: true; user: User; business: Business; role: OrganizationRole }
+  | { ok: false; status: 401 | 403; message: string }
+> {
+  const workspace = await getApiWorkspace();
+  if (!workspace.ok) {
+    return workspace;
+  }
+
+  if (!hasPermission(workspace.role, permission)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "You do not have permission for this action.",
+    };
+  }
+
+  return {
+    ok: true,
+    user: workspace.user,
+    business: workspace.business,
+    role: workspace.role,
   };
 }

@@ -2,6 +2,7 @@ import { VendorFilters } from "@/components/vendors/vendor-filters";
 import { Alert } from "@/components/ui/alert";
 import { linkButtonClassName } from "@/components/ui/button";
 import { WithIcon } from "@/components/ui/with-icon";
+import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { getWorkspaceContext } from "@/lib/workspace";
 import { Plus } from "lucide-react";
@@ -13,7 +14,7 @@ export default async function VendorsIndexLayout({
 }: {
   children: ReactNode;
 }) {
-  const { business } = await getWorkspaceContext();
+  const { business, role } = await getWorkspaceContext();
 
   if (!business) {
     return (
@@ -30,9 +31,11 @@ export default async function VendorsIndexLayout({
           <p className="text-sm text-stone-500">
             Suppliers for {business.name}.
           </p>
-          <Link href="/vendors/new" className={cn(linkButtonClassName())}>
-            <WithIcon icon={Plus}>Add vendor</WithIcon>
-          </Link>
+          {hasPermission(role, "vendors.create") ? (
+            <Link href="/vendors/new" className={cn(linkButtonClassName())}>
+              <WithIcon icon={Plus}>Add vendor</WithIcon>
+            </Link>
+          ) : null}
         </div>
         <Suspense fallback={<div className="h-12" />}>
           <VendorFilters />

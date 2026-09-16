@@ -1,5 +1,7 @@
 import { getAppBaseUrl } from "@/lib/app-url";
 import { Providers } from "@/components/providers";
+import { isRtlLanguage } from "@/lib/i18n/config";
+import { readLanguageCookie } from "@/lib/i18n/language-cookie";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
@@ -111,13 +113,16 @@ export const viewport = {
   themeColor: "#FF7A45",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const language = await readLanguageCookie();
+  const dir = isRtlLanguage(language) ? "rtl" : "ltr";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={language} dir={dir} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
         suppressHydrationWarning
@@ -125,7 +130,7 @@ export default function RootLayout({
         <Script id="strip-extension-attrs" strategy="beforeInteractive">
           {stripExtensionAttributes}
         </Script>
-        <Providers>{children}</Providers>
+        <Providers language={language}>{children}</Providers>
       </body>
     </html>
   );

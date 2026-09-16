@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/lib/i18n/locale-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -22,181 +24,182 @@ import {
 import { usePathname } from "next/navigation";
 
 type TitleConfig = {
-  title: string;
+  titleKey: MessageKey;
   icon: LucideIcon;
 };
 
 function getTitleConfig(pathname: string): TitleConfig {
   if (pathname === "/projects/new") {
-    return { title: "New project", icon: FolderKanban };
+    return { titleKey: "pages.projectsNew", icon: FolderKanban };
   }
 
   if (/^\/projects\/[^/]+\/reports\/new$/.test(pathname)) {
-    return { title: "New daily report", icon: FileText };
+    return { titleKey: "pages.dailyReportNew", icon: FileText };
   }
 
   if (/^\/projects\/[^/]+\/reports\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit daily report", icon: FileText };
+    return { titleKey: "pages.dailyReportEdit", icon: FileText };
   }
 
   if (/^\/projects\/[^/]+\/reports\/[^/]+$/.test(pathname)) {
-    return { title: "Daily report", icon: FileText };
+    return { titleKey: "pages.dailyReport", icon: FileText };
   }
 
   if (/^\/projects\/[^/]+\/reports$/.test(pathname)) {
-    return { title: "Daily reports", icon: CalendarDays };
+    return { titleKey: "pages.dailyReports", icon: CalendarDays };
   }
 
   if (/^\/projects\/[^/]+\/labour\/attendance$/.test(pathname)) {
-    return { title: "Attendance", icon: CalendarDays };
+    return { titleKey: "pages.attendance", icon: CalendarDays };
   }
 
   if (/^\/projects\/[^/]+\/labour$/.test(pathname)) {
-    return { title: "Labour", icon: Users };
+    return { titleKey: "pages.labour", icon: Users };
   }
 
   if (/^\/projects\/[^/]+\/materials$/.test(pathname)) {
-    return { title: "Materials", icon: Package };
+    return { titleKey: "pages.materials", icon: Package };
   }
 
   if (/^\/projects\/[^/]+\/expenses\/new$/.test(pathname)) {
-    return { title: "New expense", icon: Wallet };
+    return { titleKey: "pages.expenseNew", icon: Wallet };
   }
 
   if (/^\/projects\/[^/]+\/expenses\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit expense", icon: Wallet };
+    return { titleKey: "pages.expenseEdit", icon: Wallet };
   }
 
   if (/^\/projects\/[^/]+\/expenses\/[^/]+$/.test(pathname)) {
-    return { title: "Expense", icon: Wallet };
+    return { titleKey: "pages.expense", icon: Wallet };
   }
 
   if (/^\/projects\/[^/]+\/expenses$/.test(pathname)) {
-    return { title: "Expenses", icon: Wallet };
+    return { titleKey: "pages.expenses", icon: Wallet };
   }
 
   if (/^\/projects\/[^/]+\/quotations\/new$/.test(pathname)) {
-    return { title: "New quotation", icon: ClipboardList };
+    return { titleKey: "pages.quotationNew", icon: ClipboardList };
   }
 
   if (/^\/projects\/[^/]+\/quotations$/.test(pathname)) {
-    return { title: "Quotations", icon: ClipboardList };
+    return { titleKey: "pages.quotations", icon: ClipboardList };
   }
 
   if (/^\/projects\/[^/]+\/boq/.test(pathname)) {
-    return { title: "BOQ", icon: Calculator };
+    return { titleKey: "pages.boq", icon: Calculator };
   }
 
   if (/^\/projects\/[^/]+\/client-portal$/.test(pathname)) {
-    return { title: "Client portal", icon: Share2 };
+    return { titleKey: "pages.clientPortal", icon: Share2 };
   }
 
   if (/^\/projects\/[^/]+\/documents$/.test(pathname)) {
-    return { title: "Documents", icon: FileText };
+    return { titleKey: "pages.documents", icon: FileText };
   }
 
   if (/^\/projects\/[^/]+\/ai$/.test(pathname) || pathname === "/ai") {
-    return { title: "BuildPilot AI", icon: Bot };
+    return { titleKey: "pages.ai", icon: Bot };
   }
 
   if (/^\/projects\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit project", icon: FolderKanban };
+    return { titleKey: "pages.projectsEdit", icon: FolderKanban };
   }
 
   if (/^\/projects\/[^/]+$/.test(pathname)) {
-    return { title: "Overview", icon: LayoutDashboard };
+    return { titleKey: "pages.projectsOverview", icon: LayoutDashboard };
   }
 
   if (pathname === "/projects" || pathname.startsWith("/projects/")) {
-    return { title: "Projects", icon: FolderKanban };
+    return { titleKey: "pages.projects", icon: FolderKanban };
   }
 
   if (pathname === "/workers/new") {
-    return { title: "New worker", icon: Users };
+    return { titleKey: "pages.workersNew", icon: Users };
   }
 
   if (/^\/workers\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit worker", icon: Users };
+    return { titleKey: "pages.workersEdit", icon: Users };
   }
 
   if (/^\/workers\/[^/]+$/.test(pathname)) {
-    return { title: "Worker", icon: Users };
+    return { titleKey: "pages.worker", icon: Users };
   }
 
   if (pathname === "/workers" || pathname.startsWith("/workers/")) {
-    return { title: "Workers", icon: Users };
+    return { titleKey: "pages.workers", icon: Users };
   }
 
   if (pathname === "/materials/new") {
-    return { title: "New material", icon: Package };
+    return { titleKey: "pages.materialsNew", icon: Package };
   }
 
   if (/^\/materials\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit material", icon: Package };
+    return { titleKey: "pages.materialsEdit", icon: Package };
   }
 
   if (/^\/materials\/[^/]+$/.test(pathname)) {
-    return { title: "Material", icon: Package };
+    return { titleKey: "pages.material", icon: Package };
   }
 
   if (pathname === "/materials" || pathname.startsWith("/materials/")) {
-    return { title: "Materials", icon: Package };
+    return { titleKey: "pages.materials", icon: Package };
   }
 
   if (pathname === "/vendors/new") {
-    return { title: "New vendor", icon: Building2 };
+    return { titleKey: "pages.vendorsNew", icon: Building2 };
   }
 
   if (/^\/vendors\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit vendor", icon: Building2 };
+    return { titleKey: "pages.vendorsEdit", icon: Building2 };
   }
 
   if (/^\/vendors\/[^/]+$/.test(pathname)) {
-    return { title: "Vendor", icon: Building2 };
+    return { titleKey: "pages.vendor", icon: Building2 };
   }
 
   if (pathname === "/vendors" || pathname.startsWith("/vendors/")) {
-    return { title: "Vendors", icon: Building2 };
+    return { titleKey: "pages.vendors", icon: Building2 };
   }
 
   if (pathname === "/quotations/new") {
-    return { title: "New quotation", icon: ClipboardList };
+    return { titleKey: "pages.quotationNew", icon: ClipboardList };
   }
 
   if (/^\/quotations\/[^/]+\/edit$/.test(pathname)) {
-    return { title: "Edit quotation", icon: ClipboardList };
+    return { titleKey: "pages.quotationEdit", icon: ClipboardList };
   }
 
   if (/^\/quotations\/[^/]+$/.test(pathname)) {
-    return { title: "Quotation", icon: ClipboardList };
+    return { titleKey: "pages.quotation", icon: ClipboardList };
   }
 
   if (pathname === "/quotations" || pathname.startsWith("/quotations/")) {
-    return { title: "Quotations", icon: ClipboardList };
+    return { titleKey: "pages.quotations", icon: ClipboardList };
   }
 
   if (pathname.startsWith("/settings")) {
-    return { title: "Settings", icon: Settings };
+    return { titleKey: "pages.settings", icon: Settings };
   }
 
   if (pathname.startsWith("/account")) {
-    return { title: "Account", icon: UserRound };
+    return { titleKey: "pages.account", icon: UserRound };
   }
 
   if (pathname.startsWith("/ai")) {
-    return { title: "BuildPilot AI", icon: Bot };
+    return { titleKey: "pages.ai", icon: Bot };
   }
 
   if (pathname.startsWith("/dashboard")) {
-    return { title: "Dashboard", icon: LayoutDashboard };
+    return { titleKey: "pages.dashboard", icon: LayoutDashboard };
   }
 
-  return { title: "Workspace", icon: Archive };
+  return { titleKey: "pages.workspace", icon: Archive };
 }
 
 export function PageTitle({ className }: { className?: string }) {
   const pathname = usePathname();
-  const { title, icon: Icon } = getTitleConfig(pathname);
+  const { t } = useLocale();
+  const { titleKey, icon: Icon } = getTitleConfig(pathname);
 
   return (
     <h1
@@ -208,7 +211,7 @@ export function PageTitle({ className }: { className?: string }) {
       <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-100">
         <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
       </span>
-      {title}
+      {t(titleKey)}
     </h1>
   );
 }

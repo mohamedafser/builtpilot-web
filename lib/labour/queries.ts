@@ -486,10 +486,11 @@ export const getProjectLabourDashboard = cache(
       : startOfMonthIso(date);
     const to = options.to ? parseLabourDate(options.to) : date;
 
-    const [assigned, today, summary] = await Promise.all([
+    const [assigned, today, summary, sheet] = await Promise.all([
       getProjectWorkers(projectId),
       getLabourTodayStats(projectId, date),
       getLabourSummary(projectId, from, to),
+      getAttendanceSheet(projectId, date),
     ]);
 
     if (assigned.error === "not_found" || today.error === "not_found") {
@@ -508,9 +509,20 @@ export const getProjectLabourDashboard = cache(
       return { dashboard: null, error: summary.error };
     }
 
+    if (sheet.error && sheet.error !== "not_found") {
+      return { dashboard: null, error: sheet.error };
+    }
+
+    const attendanceByWorker = new Map(
+      sheet.rows.map((row) => [row.worker.id, row.attendance]),
+    );
+
     return {
       dashboard: {
-        assigned: assigned.assignments,
+        assigned: assigned.assignments.map((assignment) => ({
+          ...assignment,
+          today_attendance: attendanceByWorker.get(assignment.worker.id) ?? null,
+        })),
         today: today.stats,
         summary: summary.summary,
       },

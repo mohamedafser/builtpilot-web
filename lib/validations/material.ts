@@ -20,6 +20,12 @@ const optionalNotes = z
   .optional()
   .or(z.literal(""));
 
+const requiredNotes = z
+  .string({ error: "Notes are required." })
+  .trim()
+  .min(1, "Notes are required.")
+  .max(5000, "Notes are too long.");
+
 function toTrimmedString(value: string | number | null | undefined): string {
   if (value == null || value === "") {
     return "";
@@ -187,7 +193,7 @@ export const receiveMaterialSchema = z.object({
   unit_price: optionalMoney,
   transaction_date: isoDate,
   reference_number: optionalText,
-  notes: optionalNotes,
+  notes: requiredNotes,
 });
 
 export const useMaterialSchema = z.object({
@@ -199,7 +205,7 @@ export const useMaterialSchema = z.object({
     .or(z.literal("")),
   quantity: requiredQuantity,
   transaction_date: isoDate,
-  notes: optionalNotes,
+  notes: requiredNotes,
 });
 
 export const returnMaterialSchema = z.object({

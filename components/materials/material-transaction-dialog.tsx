@@ -52,6 +52,17 @@ function buildReceiveReferenceNumber(material: Material): string {
   return `RCV-${materialPart}-${datePart}-${idPart}`;
 }
 
+function unitPriceDisplay(material: Material | undefined): string {
+  if (
+    !material ||
+    material.default_unit_price == null ||
+    material.default_unit_price === ""
+  ) {
+    return "";
+  }
+  return String(material.default_unit_price);
+}
+
 export function MaterialTransactionDialog({
   projectId,
   mode,
@@ -70,7 +81,6 @@ export function MaterialTransactionDialog({
   onClose: () => void;
   onSaved: () => void;
   defaultMaterialId?: string;
-  /** Current and minimum stock on this project, keyed by material id. */
   stockByMaterialId?: Record<
     string,
     { current: string; minimum: string | null }
@@ -99,9 +109,10 @@ export function MaterialTransactionDialog({
     materialCount: materials.length,
     mode,
   });
+  const isProjectTxn = mode === "receive" || mode === "use";
 
   const availableStockLabel = useMemo(() => {
-    if (!selected || (mode !== "receive" && mode !== "use")) {
+    if (!selected || !isProjectTxn) {
       return null;
     }
 
@@ -117,10 +128,10 @@ export function MaterialTransactionDialog({
 
     const minimum = formatQuantityWithUnit(minimumRaw, selected.unit);
     return `${current} (min ${minimum})`;
-  }, [mode, selected, stockByMaterialId]);
+  }, [isProjectTxn, selected, stockByMaterialId]);
 
   const quantityLimit = useMemo(() => {
-    if (!selected || (mode !== "receive" && mode !== "use")) {
+    if (!selected || !isProjectTxn) {
       return null;
     }
 
@@ -133,20 +144,18 @@ export function MaterialTransactionDialog({
     const availableMilli = parseQuantityToMilli(stock?.current ?? "0") ?? 0;
 
     if (mode === "use") {
-      // Cannot use more than on hand, and not more than minimum stock when set.
       if (minimumMilli != null && minimumMilli > 0) {
         return Math.min(availableMilli, minimumMilli);
       }
       return availableMilli;
     }
 
-    // Receive: do not enter more than minimum stock when configured.
     if (minimumMilli != null && minimumMilli > 0) {
       return minimumMilli;
     }
 
     return null;
-  }, [mode, selected, stockByMaterialId]);
+  }, [isProjectTxn, mode, selected, stockByMaterialId]);
 
   const quantityMaxLabel = useMemo(() => {
     if (quantityLimit == null || !selected) {
@@ -182,8 +191,6 @@ export function MaterialTransactionDialog({
     setQuantity(raw);
   }
 
-  // Reset form when the dialog opens or the default material changes.
-  // Do not depend on onClose — parent often passes an inline callback.
   useEffect(() => {
     if (!open) {
       return;
@@ -210,7 +217,7 @@ export function MaterialTransactionDialog({
   }, [open, defaultMaterialId, mode]);
 
   useEffect(() => {
-    if (!open || (mode !== "receive" && mode !== "use")) {
+    if (!open || !isProjectTxn) {
       return;
     }
 
@@ -232,25 +239,18 @@ export function MaterialTransactionDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, mode]);
+  }, [open, isProjectTxn]);
 
-  // Keep catalog vendor locked in once the selected material is known.
   useEffect(() => {
-    if (!open || (mode !== "receive" && mode !== "use")) {
-      return;
-    }
-    if (!selected) {
+    if (!open || !isProjectTxn || !selected) {
       return;
     }
 
     setVendorId(selected.vendor_id ?? "");
-  }, [open, mode, selected?.id, selected?.vendor_id]);
+  }, [open, isProjectTxn, selected?.id, selected?.vendor_id]);
 
   useEffect(() => {
-    if (!open || (mode !== "receive" && mode !== "use")) {
-      return;
-    }
-    if (quantityLimit == null || !quantity) {
+    if (!open || !isProjectTxn || quantityLimit == null || !quantity) {
       return;
     }
 
@@ -258,7 +258,7 @@ export function MaterialTransactionDialog({
     if (parsed != null && parsed > quantityLimit) {
       setQuantity(formatMilli(quantityLimit));
     }
-  }, [open, mode, quantity, quantityLimit]);
+  }, [open, isProjectTxn, quantity, quantityLimit]);
 
   useEffect(() => {
     if (!open || mode !== "receive") {
@@ -274,15 +274,25 @@ export function MaterialTransactionDialog({
   }, [open, mode, selected]);
 
   useEffect(() => {
-    if (!open || mode !== "receive" || !selected) {
+    if (!open || !isProjectTxn) {
       return;
     }
-    setUnitPrice(
-      selected.default_unit_price == null || selected.default_unit_price === ""
-        ? ""
-        : String(selected.default_unit_price),
-    );
-  }, [open, mode, selected]);
+    setUnitPrice(unitPriceDisplay(selected));
+  }, [open, isProjectTxn, selected]);
+
+  // Receive: always prefill Quantity with the Max value and keep it locked.
+  useEffect(() => {
+    if (!open || mode !== "receive") {
+      return;
+    }
+
+    if (quantityLimit != null && quantityLimit > 0) {
+      setQuantity(formatMilli(quantityLimit));
+      return;
+    }
+
+    setQuantity("");
+  }, [open, mode, quantityLimit, materialId]);
 
   const totalLabel = useMemo(() => {
     const qty = parseQuantityToMilli(quantity);
@@ -337,8 +347,24 @@ export function MaterialTransactionDialog({
   function submit() {
     setError(null);
 
-    if ((mode === "receive" || mode === "use") && quantityLimit != null) {
-      const qtyMilli = parseQuantityToMilli(quantity);
+    let submitQuantity = String(quantity).trim();
+    if (mode === "receive" && quantityLimit != null && quantityLimit > 0) {
+      submitQuantity = formatMilli(quantityLimit);
+      setQuantity(submitQuantity);
+    }
+
+    if (
+      (mode === "receive" || mode === "use") &&
+      !notes.trim()
+    ) {
+      setError("Notes are required.");
+      return;
+    }
+
+    if (isProjectTxn && quantityLimit != null) {
+      const qtyMilli = parseQuantityToMilli(
+        mode === "receive" ? submitQuantity : quantity,
+      );
       if (qtyMilli == null || qtyMilli <= 0) {
         setError("Enter a valid quantity.");
         return;
@@ -347,18 +373,23 @@ export function MaterialTransactionDialog({
         setError(
           mode === "use"
             ? `Quantity cannot exceed available stock${quantityMaxLabel ? ` (${quantityMaxLabel})` : ""}.`
-            : `Quantity cannot exceed minimum stock${quantityMaxLabel ? ` (${quantityMaxLabel})` : ""}.`,
+            : `Quantity cannot exceed maximum stock${quantityMaxLabel ? ` (${quantityMaxLabel})` : ""}.`,
         );
         return;
       }
     }
 
     startTransition(async () => {
+      const payload =
+        mode === "receive" && quantityLimit != null && quantityLimit > 0
+          ? { ...body(), quantity: submitQuantity }
+          : body();
+
       const result = await requestJson<{ id: string }>(
         `/api/projects/${projectId}/materials/${endpoint()}`,
         {
           method: "POST",
-          body: JSON.stringify(body()),
+          body: JSON.stringify(payload),
           notify: false,
         },
       );
@@ -375,7 +406,8 @@ export function MaterialTransactionDialog({
     });
   }
 
-  const showVendorField = mode === "receive" || mode === "use";
+  const unitPriceLabel =
+    unitPrice.trim() === "" ? "—" : formatMaterialCost(unitPrice);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:px-4">
@@ -389,180 +421,296 @@ export function MaterialTransactionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="txn-title"
-        className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-5 shadow-lg sm:max-w-lg sm:rounded-xl"
+        className={
+          isProjectTxn
+            ? "relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-4 shadow-lg sm:max-w-lg sm:rounded-xl sm:p-4"
+            : "relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-5 shadow-lg sm:max-w-lg sm:rounded-xl"
+        }
       >
-        <h2 id="txn-title" className="text-base font-semibold text-stone-900">
+        <h2
+          id="txn-title"
+          className={
+            isProjectTxn
+              ? "text-sm font-semibold text-stone-900"
+              : "text-base font-semibold text-stone-900"
+          }
+        >
           {TITLES[mode]}
         </h2>
 
-        <div className="mt-4 space-y-4">
-          <div>
-            <Label htmlFor="txn-material">Material</Label>
-            {waitingForMaterial ? (
-              <p className="mt-1.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
-                Loading materials…
-              </p>
-            ) : materials.length === 0 ? (
-              <p className="mt-1.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
-                {mode === "receive"
-                  ? "No materials waiting for receipt."
-                  : "No materials available."}
-              </p>
-            ) : (
-              <Select
-                id="txn-material"
-                className="h-12 sm:h-10"
-                value={materialId}
-                onChange={(event) => setMaterialId(event.target.value)}
-              >
-                <option value="">Select material</option>
-                {materials.map((material) => (
-                  <option key={material.id} value={material.id}>
-                    {material.name} ({MATERIAL_UNIT_SHORT_LABELS[material.unit]}
-                    )
-                  </option>
-                ))}
-              </Select>
-            )}
-            {availableStockLabel ? (
-              <p className="mt-1.5 text-sm text-stone-600">
-                Available stock: {availableStockLabel}
-              </p>
-            ) : null}
-          </div>
-
-          {showVendorField ? (
-            <div>
-              <Label htmlFor="txn-vendor">Vendor</Label>
-              {vendorsLoading ? (
-                <p className="mt-1.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
-                  Loading vendor…
-                </p>
-              ) : (
-                <p
-                  id="txn-vendor"
-                  className="mt-1.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-medium text-stone-800"
-                >
-                  {vendorName ?? "No vendor"}
-                </p>
-              )}
-              <p className="mt-1 text-xs text-stone-500">
-                Vendor comes from the material catalog and cannot be changed
-                here.
-              </p>
-            </div>
-          ) : null}
-
-          {mode === "adjust" ? (
-            <div>
-              <Label htmlFor="txn-direction">Adjustment type</Label>
-              <Select
-                id="txn-direction"
-                className="h-12 sm:h-10"
-                value={direction}
-                onChange={(event) =>
-                  setDirection(event.target.value as AdjustmentDirection)
-                }
-              >
-                {ADJUSTMENT_DIRECTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {ADJUSTMENT_DIRECTION_LABELS[value]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          ) : null}
-
-          <div>
-            <Label htmlFor="txn-qty">Quantity</Label>
-            <Input
-              id="txn-qty"
-              type="number"
-              min="0"
-              max={
-                quantityLimit != null ? formatMilli(quantityLimit) : undefined
-              }
-              step="0.001"
-              inputMode="decimal"
-              className="h-12 sm:h-10"
-              value={quantity}
-              onChange={(event) => onQuantityChange(event.target.value)}
-              disabled={waitingForMaterial}
-            />
-            {quantityMaxLabel ? (
-              <p className="mt-1 text-xs text-stone-500">
-                {mode === "use"
-                  ? `Max ${quantityMaxLabel} (available / minimum stock).`
-                  : `Max ${quantityMaxLabel} (minimum stock).`}
-              </p>
-            ) : null}
-          </div>
-
-          {mode === "receive" ? (
+        <div className={isProjectTxn ? "mt-3 space-y-2.5" : "mt-4 space-y-4"}>
+          {isProjectTxn ? (
             <>
-              <div>
-                <Label htmlFor="txn-price">Unit price (₹)</Label>
-                <Input
-                  id="txn-price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputMode="decimal"
-                  className="h-12 sm:h-10"
-                  value={unitPrice}
-                  onChange={(event) => setUnitPrice(event.target.value)}
-                  disabled={waitingForMaterial}
-                />
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="txn-material" className="text-xs">
+                    Material
+                  </Label>
+                  {waitingForMaterial ? (
+                    <p className="mt-1 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs text-stone-500">
+                      Loading materials…
+                    </p>
+                  ) : materials.length === 0 ? (
+                    <p className="mt-1 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs text-stone-500">
+                      {mode === "receive"
+                        ? "No materials waiting for receipt."
+                        : "No materials available."}
+                    </p>
+                  ) : (
+                    <Select
+                      id="txn-material"
+                      className="mt-1 h-9 text-sm"
+                      value={materialId}
+                      onChange={(event) => setMaterialId(event.target.value)}
+                    >
+                      <option value="">Select material</option>
+                      {materials.map((material) => (
+                        <option key={material.id} value={material.id}>
+                          {material.name} (
+                          {MATERIAL_UNIT_SHORT_LABELS[material.unit]})
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  {availableStockLabel ? (
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      Available: {availableStockLabel}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <Label htmlFor="txn-vendor" className="text-xs">
+                    Vendor
+                  </Label>
+                  {vendorsLoading ? (
+                    <p className="mt-1 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs text-stone-500">
+                      Loading vendor…
+                    </p>
+                  ) : (
+                    <p
+                      id="txn-vendor"
+                      className="mt-1 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs font-medium text-stone-800"
+                    >
+                      {vendorName ?? "No vendor"}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    From material catalog (locked).
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-stone-600">
-                Total: {totalLabel ?? "—"}
-              </p>
-              <div>
-                <Label htmlFor="txn-ref">Reference number</Label>
-                <Input
-                  id="txn-ref"
-                  className="h-12 sm:h-10"
-                  value={reference}
-                  onChange={(event) => setReference(event.target.value)}
-                  disabled={waitingForMaterial}
-                />
-                <p className="mt-1 text-xs text-stone-500">
-                  Auto-generated from the selected material. You can edit it
-                  before saving.
+
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="txn-qty" className="text-xs">
+                    Quantity
+                  </Label>
+                  <Input
+                    id="txn-qty"
+                    type="number"
+                    min="0"
+                    max={
+                      quantityLimit != null
+                        ? formatMilli(quantityLimit)
+                        : undefined
+                    }
+                    step="0.001"
+                    inputMode="decimal"
+                    className="mt-1 h-9 text-sm disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-800"
+                    value={
+                      mode === "receive" &&
+                      quantityLimit != null &&
+                      quantityLimit > 0
+                        ? formatMilli(quantityLimit)
+                        : quantity
+                    }
+                    onChange={(event) => onQuantityChange(event.target.value)}
+                    disabled={waitingForMaterial || mode === "receive"}
+                    readOnly={mode === "receive"}
+                  />
+                  {quantityMaxLabel ? (
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      Max {quantityMaxLabel}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <Label htmlFor="txn-price" className="text-xs">
+                    Unit price (₹)
+                  </Label>
+                  <p
+                    id="txn-price"
+                    className="mt-1 rounded-md border border-stone-200 bg-stone-50 px-2.5 py-2 text-sm font-medium text-stone-800 tabular-nums"
+                  >
+                    {unitPriceLabel}
+                  </p>
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    Catalog price (locked).
+                  </p>
+                </div>
+
+                {mode === "receive" ? (
+                  <div>
+                    <Label htmlFor="txn-ref" className="text-xs">
+                      Reference
+                    </Label>
+                    <Input
+                      id="txn-ref"
+                      className="mt-1 h-9 text-sm"
+                      value={reference}
+                      onChange={(event) => setReference(event.target.value)}
+                      disabled={waitingForMaterial}
+                    />
+                  </div>
+                ) : null}
+
+                <div>
+                  <Label htmlFor="txn-date" className="text-xs">
+                    Date
+                  </Label>
+                  <Input
+                    id="txn-date"
+                    type="date"
+                    className="mt-1 h-9 text-sm"
+                    value={date}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              {mode === "receive" ? (
+                <p className="text-xs text-stone-600">
+                  Total:{" "}
+                  <span className="font-semibold text-stone-900 tabular-nums">
+                    {totalLabel ?? "—"}
+                  </span>
                 </p>
+              ) : null}
+
+              <div>
+                <Label htmlFor="txn-notes" className="text-xs">
+                  Notes
+                  {mode === "receive" || mode === "use" ? (
+                    <span className="text-red-600" aria-hidden="true">
+                      {" "}
+                      *
+                    </span>
+                  ) : null}
+                </Label>
+                <Textarea
+                  id="txn-notes"
+                  rows={2}
+                  className="mt-1 min-h-0 resize-y text-sm"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  required={mode === "receive" || mode === "use"}
+                  aria-required={mode === "receive" || mode === "use"}
+                  placeholder={
+                    mode === "receive"
+                      ? "Add a note for this receipt"
+                      : mode === "use"
+                        ? "Add a note for this usage"
+                        : undefined
+                  }
+                />
               </div>
             </>
-          ) : null}
+          ) : (
+            <>
+              <div>
+                <Label htmlFor="txn-material">Material</Label>
+                <Select
+                  id="txn-material"
+                  className="h-12 sm:h-10"
+                  value={materialId}
+                  onChange={(event) => setMaterialId(event.target.value)}
+                >
+                  <option value="">Select material</option>
+                  {materials.map((material) => (
+                    <option key={material.id} value={material.id}>
+                      {material.name} (
+                      {MATERIAL_UNIT_SHORT_LABELS[material.unit]})
+                    </option>
+                  ))}
+                </Select>
+              </div>
 
-          <div>
-            <Label htmlFor="txn-date">Date</Label>
-            <Input
-              id="txn-date"
-              type="date"
-              className="h-12 sm:h-10"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-          </div>
+              {mode === "adjust" ? (
+                <div>
+                  <Label htmlFor="txn-direction">Adjustment type</Label>
+                  <Select
+                    id="txn-direction"
+                    className="h-12 sm:h-10"
+                    value={direction}
+                    onChange={(event) =>
+                      setDirection(event.target.value as AdjustmentDirection)
+                    }
+                  >
+                    {ADJUSTMENT_DIRECTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {ADJUSTMENT_DIRECTION_LABELS[value]}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
 
-          <div>
-            <Label htmlFor="txn-notes">
-              {mode === "adjust" ? "Reason" : "Notes"}
-            </Label>
-            <Textarea
-              id="txn-notes"
-              rows={3}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
+              <div>
+                <Label htmlFor="txn-qty">Quantity</Label>
+                <Input
+                  id="txn-qty"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  inputMode="decimal"
+                  className="h-12 sm:h-10"
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="txn-date">Date</Label>
+                <Input
+                  id="txn-date"
+                  type="date"
+                  className="h-12 sm:h-10"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="txn-notes">
+                  {mode === "adjust" ? "Reason" : "Notes"}
+                </Label>
+                <Textarea
+                  id="txn-notes"
+                  rows={3}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? (
+          <p className="mt-2 text-xs text-red-600 sm:text-sm">{error}</p>
+        ) : null}
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div
+          className={
+            isProjectTxn
+              ? "mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+              : "mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+          }
+        >
           <Button
             variant="secondary"
+            size={isProjectTxn ? "sm" : "md"}
             onClick={onClose}
             disabled={isPending}
             icon={X}
@@ -570,15 +718,22 @@ export function MaterialTransactionDialog({
             Cancel
           </Button>
           <Button
+            size={isProjectTxn ? "sm" : "md"}
             onClick={submit}
             disabled={
               isPending ||
               !materialId ||
-              !quantity ||
+              !(
+                quantity ||
+                (mode === "receive" &&
+                  quantityLimit != null &&
+                  quantityLimit > 0)
+              ) ||
+              ((mode === "receive" || mode === "use") && !notes.trim()) ||
               waitingForMaterial ||
-              (showVendorField && vendorsLoading)
+              (isProjectTxn && vendorsLoading)
             }
-            className="h-12 sm:h-10"
+            className={isProjectTxn ? "h-9" : "h-12 sm:h-10"}
             icon={Save}
           >
             {isPending ? "Saving..." : "Save"}

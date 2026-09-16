@@ -9,7 +9,7 @@ import {
   normalizeLanguage,
   type AppLanguage,
 } from "@/lib/i18n/config";
-import { translate, type MessageKey } from "@/lib/i18n/messages";
+import { translate, translateWithParams, type MessageKey } from "@/lib/i18n/messages";
 import {
   formatMoney as formatMoneyValue,
   setRuntimeLocale,
@@ -30,6 +30,10 @@ type LocaleContextValue = {
   countryCode: string;
   dir: "ltr" | "rtl";
   t: (key: MessageKey) => string;
+  tParams: (
+    key: MessageKey,
+    params: Record<string, string | number>,
+  ) => string;
   formatMoney: (value: string | number | null) => string;
   setLanguage: (language: AppLanguage) => void;
 };
@@ -72,6 +76,12 @@ export function LocaleProvider({
     [language],
   );
 
+  const tParams = useCallback(
+    (key: MessageKey, params: Record<string, string | number>) =>
+      translateWithParams(language, key, params),
+    [language],
+  );
+
   const formatMoney = useCallback(
     (value: string | number | null) =>
       formatMoneyValue(value, currencyCode, language),
@@ -85,10 +95,11 @@ export function LocaleProvider({
       countryCode,
       dir: isRtlLanguage(language) ? "rtl" : "ltr",
       t,
+      tParams,
       formatMoney,
       setLanguage: setLanguageState,
     }),
-    [language, currencyCode, countryCode, t, formatMoney],
+    [language, currencyCode, countryCode, t, tParams, formatMoney],
   );
 
   return (
@@ -106,6 +117,10 @@ export function useLocale() {
       countryCode: "IN",
       dir: "ltr" as const,
       t: (key: MessageKey) => translate(DEFAULT_LANGUAGE, key),
+      tParams: (
+        key: MessageKey,
+        params: Record<string, string | number>,
+      ) => translateWithParams(DEFAULT_LANGUAGE, key, params),
       formatMoney: (value: string | number | null) =>
         formatMoneyValue(value, DEFAULT_CURRENCY, DEFAULT_LANGUAGE),
       setLanguage: () => undefined,

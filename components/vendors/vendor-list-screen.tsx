@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import { VendorList } from "@/components/vendors/vendor-list";
 import { VendorListSkeleton } from "@/components/vendors/vendor-skeletons";
 import { Alert } from "@/components/ui/alert";
@@ -7,6 +8,7 @@ import { linkButtonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/pagination";
 import { requestJson } from "@/lib/api/client";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 import type { VendorListItem } from "@/lib/vendors/types";
 import { Building2, FilterX, Plus } from "lucide-react";
@@ -24,6 +26,7 @@ type VendorListResponse = {
 };
 
 export function VendorListScreen() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -65,7 +68,7 @@ export function VendorListScreen() {
   }, [query, status, page, pageSize]);
 
   if (isLoading) return <VendorListSkeleton />;
-  if (error) return <Alert variant="error">{error}</Alert>;
+  if (error) return <Alert variant="error">{t("vendors.loadError")}</Alert>;
 
   const vendors = result?.vendors ?? [];
   const total = result?.total ?? 0;
@@ -75,21 +78,23 @@ export function VendorListScreen() {
     return (
       <EmptyState
         icon={Building2}
-        title={hasActiveFilters ? "No matching vendors" : "No vendors added yet."}
+        title={hasActiveFilters ? "No matching vendors" : t("vendors.empty")}
         description={
           hasActiveFilters
             ? "Try a different search or status filter."
-            : "Add suppliers so you can record material purchases against them."
+            : t("vendors.emptyHint")
         }
         action={
           hasActiveFilters ? (
             <Link href="/vendors" className={cn(linkButtonClassName("secondary"))}>
-              <WithIcon icon={FilterX}>Clear filters</WithIcon>
+              <WithIcon icon={FilterX}>{t("common.clearFilters")}</WithIcon>
             </Link>
           ) : (
-            <Link href="/vendors/new" className={cn(linkButtonClassName())}>
-              <WithIcon icon={Plus}>Add vendor</WithIcon>
-            </Link>
+            <Can permission="vendors.create">
+              <Link href="/vendors/new" className={cn(linkButtonClassName())}>
+                <WithIcon icon={Plus}>{t("vendors.new")}</WithIcon>
+              </Link>
+            </Can>
           )
         }
       />

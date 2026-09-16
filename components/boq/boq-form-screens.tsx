@@ -10,11 +10,13 @@ import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { linkButtonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { WithIcon } from "@/components/ui/with-icon";
 import { useApiData } from "@/hooks/use-api-data";
 import { useProject } from "@/hooks/use-project";
 import { boqActions } from "@/lib/boq/calculations";
 import type { BoqDetail } from "@/lib/boq/types";
 import { cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -115,14 +117,22 @@ export function EditBoqScreen({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-semibold text-stone-900">
-          Edit BOQ estimate
-        </h2>
-        <p className="mt-1 text-sm text-stone-500">
-          Add or update sections and items. Estimated cost is calculated as
-          quantity × rate.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-stone-900">
+            Edit BOQ estimate
+          </h2>
+          <p className="mt-1 text-sm text-stone-500">
+            Add or update sections and items. Estimated cost is calculated as
+            quantity × rate.
+          </p>
+        </div>
+        <Link
+          href={`/projects/${projectId}/boq/${boqId}`}
+          className={cn(linkButtonClassName("secondary", "sm"))}
+        >
+          <WithIcon icon={ArrowLeft}>Back</WithIcon>
+        </Link>
       </div>
       <BoqBuilder
         projectId={projectId}

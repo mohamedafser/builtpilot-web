@@ -19,6 +19,7 @@ import { Button, linkButtonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   MATERIAL_TRANSACTION_TYPE_LABELS,
   MATERIAL_TRANSACTION_TYPES,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/materials/stock";
 import type {
   MaterialTransactionListItem,
+  ProjectMaterialRow,
   ProjectMaterialsDashboard,
 } from "@/lib/materials/types";
 import { WithIcon } from "@/components/ui/with-icon";
@@ -77,6 +79,34 @@ function needsReceipt(row: {
   return received <= 0;
 }
 
+function hasAdjustments(row: ProjectMaterialRow) {
+  return (
+    Number(row.total_adjusted_increase) > 0 ||
+    Number(row.total_adjusted_decrease) > 0
+  );
+}
+
+function formatAdjustedCell(row: ProjectMaterialRow) {
+  const increase = Number(row.total_adjusted_increase);
+  const decrease = Number(row.total_adjusted_decrease);
+  if (increase <= 0 && decrease <= 0) {
+    return "—";
+  }
+
+  const parts: string[] = [];
+  if (increase > 0) {
+    parts.push(
+      `+${formatQuantityWithUnit(row.total_adjusted_increase, row.material.unit)}`,
+    );
+  }
+  if (decrease > 0) {
+    parts.push(
+      `−${formatQuantityWithUnit(row.total_adjusted_decrease, row.material.unit)}`,
+    );
+  }
+  return parts.join(" · ");
+}
+
 export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
   const {
     project,
@@ -109,6 +139,7 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
     null,
   );
   const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const historyType = searchParams.get("type") ?? "";
   const historyMaterial = searchParams.get("material") ?? "";
   const historyPage = searchParams.get("page") ?? "1";
@@ -156,31 +187,45 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
     [dashboardCacheKey, dashboardUrl],
   );
 
+  const loadHistory = useCallback(
+    async (options?: { showLoader?: boolean }) => {
+      const showLoader = options?.showLoader !== false;
+      if (showLoader) {
+        setHistoryLoading(true);
+      }
+
+      try {
+        const params = new URLSearchParams();
+        params.set("from", from);
+        params.set("to", to);
+        if (historyType) params.set("type", historyType);
+        if (historyMaterial) params.set("material", historyMaterial);
+        params.set("page", historyPage);
+        params.set("page_size", String(DEFAULT_PAGE_SIZE));
+
+        const result = await requestJson<HistoryResponse>(
+          `/api/projects/${projectId}/materials/transactions?${params.toString()}`,
+        );
+
+        if (result.ok) {
+          setHistory(result.data);
+        }
+      } finally {
+        if (showLoader) {
+          setHistoryLoading(false);
+        }
+      }
+    },
+    [from, historyMaterial, historyPage, historyType, projectId, to],
+  );
+
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    let cancelled = false;
-    const params = new URLSearchParams();
-    params.set("from", from);
-    params.set("to", to);
-    if (historyType) params.set("type", historyType);
-    if (historyMaterial) params.set("material", historyMaterial);
-    params.set("page", historyPage);
-    params.set("page_size", String(DEFAULT_PAGE_SIZE));
-
-    void requestJson<HistoryResponse>(
-      `/api/projects/${projectId}/materials/transactions?${params.toString()}`,
-    ).then((result) => {
-      if (cancelled) return;
-      if (result.ok) setHistory(result.data);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [from, historyMaterial, historyPage, historyType, projectId, to]);
+    void loadHistory();
+  }, [loadHistory]);
 
   const assignedMaterials = useMemo(
     () =>
@@ -448,7 +493,7 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
           <div className="hidden overflow-hidden rounded-lg border border-stone-200 md:block">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-stone-50 text-stone-500">
+                <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
                   <tr>
                     <th className="px-3 py-2 font-medium">Material</th>
                     <th className="px-3 py-2 font-medium">Vendor</th>
@@ -456,6 +501,7 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                     <th className="px-3 py-2 font-medium">Stock</th>
                     <th className="px-3 py-2 font-medium">Received</th>
                     <th className="px-3 py-2 font-medium">Used</th>
+                    <th className="px-3 py-2 font-medium">Adjusted</th>
                     <th className="px-3 py-2 font-medium">Latest price</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">
@@ -466,10 +512,15 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                 <tbody>
                   {dashboard.assigned.map((row) => {
                     const waiting = needsReceipt(row);
+                    const adjusted = hasAdjustments(row);
                     const highlighted =
                       highlightId === row.assignment_id ||
                       deepLinkMaterial === row.material.id;
                     const isUpdating = row.material.id === updatingMaterialId;
+                    const lastIncrease =
+                      row.last_adjustment?.direction === "increase";
+                    const lastDecrease =
+                      row.last_adjustment?.direction === "decrease";
 
                     if (isUpdating) {
                       return (
@@ -478,7 +529,7 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                           id={`project-material-${row.assignment_id}`}
                           className="border-t border-stone-100 bg-stone-50/80"
                         >
-                          <td className="px-3 py-3" colSpan={9}>
+                          <td className="px-3 py-3" colSpan={10}>
                             <div className="flex items-center gap-2 text-xs text-stone-500">
                               <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-stone-300" />
                               Updating material details…
@@ -497,6 +548,14 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                           highlighted &&
                             "bg-amber-50 ring-1 ring-amber-200 ring-inset",
                           waiting && !highlighted && "bg-amber-50/40",
+                          !waiting &&
+                            !highlighted &&
+                            lastIncrease &&
+                            "bg-emerald-50/35",
+                          !waiting &&
+                            !highlighted &&
+                            lastDecrease &&
+                            "bg-rose-50/35",
                         )}
                       >
                         <td className="px-3 py-2">
@@ -511,6 +570,26 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                               Waiting for receipt
                             </p>
                           ) : null}
+                          {row.last_adjustment ? (
+                            <p
+                              className={cn(
+                                "mt-0.5 text-[11px] font-medium",
+                                row.last_adjustment.direction === "increase"
+                                  ? "text-emerald-800"
+                                  : "text-rose-800",
+                              )}
+                            >
+                              Stock{" "}
+                              {row.last_adjustment.direction === "increase"
+                                ? "increased"
+                                : "decreased"}{" "}
+                              by{" "}
+                              {formatQuantityWithUnit(
+                                row.last_adjustment.quantity,
+                                row.material.unit,
+                              )}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2 text-stone-600">
                           {row.vendor_name || "—"}
@@ -518,7 +597,7 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                         <td className="px-3 py-2 text-stone-600">
                           {MATERIAL_UNIT_SHORT_LABELS[row.material.unit]}
                         </td>
-                        <td className="px-3 py-2 text-stone-600 tabular-nums">
+                        <td className="px-3 py-2 text-stone-700 tabular-nums">
                           {formatQuantityWithUnit(
                             row.current_stock,
                             row.material.unit,
@@ -535,6 +614,14 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                             row.total_used,
                             row.material.unit,
                           )}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-3 py-2 tabular-nums",
+                            adjusted ? "font-medium text-stone-800" : "text-stone-400",
+                          )}
+                        >
+                          {formatAdjustedCell(row)}
                         </td>
                         <td className="px-3 py-2 text-stone-600 tabular-nums">
                           {formatMaterialCost(row.latest_unit_price)}
@@ -575,10 +662,15 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
           <div className="space-y-2 md:hidden">
             {dashboard.assigned.map((row) => {
               const waiting = needsReceipt(row);
+              const adjusted = hasAdjustments(row);
               const highlighted =
                 highlightId === row.assignment_id ||
                 deepLinkMaterial === row.material.id;
               const isUpdating = row.material.id === updatingMaterialId;
+              const lastIncrease =
+                row.last_adjustment?.direction === "increase";
+              const lastDecrease =
+                row.last_adjustment?.direction === "decrease";
 
               if (isUpdating) {
                 return (
@@ -603,7 +695,11 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                     "rounded-lg border p-3",
                     highlighted || waiting
                       ? "border-amber-200 bg-amber-50/60"
-                      : "border-stone-200 bg-stone-50/50",
+                      : lastIncrease
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : lastDecrease
+                          ? "border-rose-200 bg-rose-50/50"
+                          : "border-stone-200 bg-stone-50/50",
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -617,6 +713,26 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                       {waiting ? (
                         <p className="mt-0.5 text-[11px] font-medium text-amber-800">
                           Waiting for receipt
+                        </p>
+                      ) : null}
+                      {row.last_adjustment ? (
+                        <p
+                          className={cn(
+                            "mt-0.5 text-[11px] font-medium",
+                            row.last_adjustment.direction === "increase"
+                              ? "text-emerald-800"
+                              : "text-rose-800",
+                          )}
+                        >
+                          Stock{" "}
+                          {row.last_adjustment.direction === "increase"
+                            ? "increased"
+                            : "decreased"}{" "}
+                          by{" "}
+                          {formatQuantityWithUnit(
+                            row.last_adjustment.quantity,
+                            row.material.unit,
+                          )}
                         </p>
                       ) : null}
                     </div>
@@ -645,6 +761,17 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
                           row.total_used,
                           row.material.unit,
                         )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-stone-500">Adjusted</dt>
+                      <dd
+                        className={cn(
+                          "mt-0.5 font-medium tabular-nums",
+                          adjusted ? "text-stone-800" : "text-stone-400",
+                        )}
+                      >
+                        {formatAdjustedCell(row)}
                       </dd>
                     </div>
                   </dl>
@@ -760,20 +887,35 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
           </div>
         }
       >
-        <MaterialTransactionList
-          transactions={history?.transactions ?? dashboard.recent_transactions}
-          emptyTitle="No transactions in this range."
-          emptyDescription="Receive material to start a project stock history."
-          showMaterial
-        />
-        {history && history.totalPages > 1 ? (
-          <Pagination
-            page={history.page}
-            pageSize={history.pageSize}
-            total={history.total}
-            totalPages={history.totalPages}
-          />
-        ) : null}
+        {historyLoading ? (
+          <div
+            className="flex items-center justify-center gap-2 py-10 text-sm text-stone-500"
+            role="status"
+            aria-live="polite"
+          >
+            <Spinner className="h-4 w-4 text-stone-400" />
+            Loading history…
+          </div>
+        ) : (
+          <>
+            <MaterialTransactionList
+              transactions={
+                history?.transactions ?? dashboard.recent_transactions
+              }
+              emptyTitle="No transactions in this range."
+              emptyDescription="Receive material to start a project stock history."
+              showMaterial
+            />
+            {history && history.totalPages > 1 ? (
+              <Pagination
+                page={history.page}
+                pageSize={history.pageSize}
+                total={history.total}
+                totalPages={history.totalPages}
+              />
+            ) : null}
+          </>
+        )}
       </CompactPanel>
 
       <AddProjectMaterialDialog
@@ -796,7 +938,10 @@ export function ProjectMaterialsScreen({ projectId }: { projectId: string }) {
             const materialId = defaultMaterialId;
             setUpdatingMaterialId(materialId ?? null);
             closeTxn();
-            void load({ force: true, showSkeleton: false }).finally(() => {
+            void Promise.all([
+              load({ force: true, showSkeleton: false }),
+              loadHistory({ showLoader: true }),
+            ]).finally(() => {
               setUpdatingMaterialId(null);
             });
           }}

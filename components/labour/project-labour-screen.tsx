@@ -13,7 +13,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button, linkButtonClassName } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { WorkerStatusBadge } from "@/components/ui/badge";
-import { WORKER_ROLE_LABELS } from "@/constants/worker";
+import { Pagination } from "@/components/ui/pagination";
+import { WORKER_ROLE_LABELS, ATTENDANCE_STATUS_LABELS } from "@/constants/worker";
 import { useDisclosure } from "@/hooks/use-disclosure";
 import { useProject } from "@/hooks/use-project";
 import { requestJson } from "@/lib/api/client";
@@ -23,12 +24,16 @@ import {
   readApiCache,
   writeApiCache,
 } from "@/lib/api/client-cache";
+import { parsePagination } from "@/lib/api/pagination";
 import {
   formatLabourCost,
   startOfMonthIso,
   todayIsoDate,
 } from "@/lib/labour/money";
-import type { ProjectLabourDashboard } from "@/lib/labour/types";
+import type {
+  ProjectLabourAssignmentRow,
+  ProjectLabourDashboard,
+} from "@/lib/labour/types";
 import { showToast } from "@/lib/toast";
 import { WithIcon } from "@/components/ui/with-icon";
 import { cn } from "@/lib/utils";
@@ -42,6 +47,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
+function needsAttendance(row: ProjectLabourAssignmentRow) {
+  return row.worker.status === "active" && row.today_attendance == null;
+}
+
 export function ProjectLabourScreen({ projectId }: { projectId: string }) {
   const { project, error: projectError, notFound, isLoading: projectLoading } =
     useProject(projectId);
@@ -49,6 +58,14 @@ export function ProjectLabourScreen({ projectId }: { projectId: string }) {
   const today = todayIsoDate();
   const from = searchParams.get("from") ?? startOfMonthIso(today);
   const to = searchParams.get("to") ?? today;
+  const workersPagination = useMemo(
+    () =>
+      parsePagination({
+        page: searchParams.get("page"),
+        page_size: searchParams.get("page_size"),
+      }),
+    [searchParams],
+  );
   const { isOpen, open, close } = useDisclosure();
   const dashboardUrl = useMemo(
     () =>
@@ -204,6 +221,25 @@ export function ProjectLabourScreen({ projectId }: { projectId: string }) {
         ? "warn"
         : "good";
 
+  const assignedTotal = dashboard.assigned.length;
+  const assignedTotalPages = Math.max(
+    1,
+    Math.ceil(assignedTotal / workersPagination.pageSize),
+  );
+  const assignedPage = Math.min(workersPagination.page, assignedTotalPages);
+  const pagedAssigned = dashboard.assigned.slice(
+    (assignedPage - 1) * workersPagination.pageSize,
+    assignedPage * workersPagination.pageSize,
+  );
+  const workersPager = (
+    <Pagination
+      page={assignedPage}
+      pageSize={workersPagination.pageSize}
+      total={assignedTotal}
+      totalPages={assignedTotalPages}
+    />
+  );
+
   return (
     <div className="space-y-4">
       <ProjectSectionHeader
@@ -308,92 +344,177 @@ export function ProjectLabourScreen({ projectId }: { projectId: string }) {
         ) : (
           <>
             <div className="hidden overflow-hidden rounded-lg border border-stone-200 md:block">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-stone-50 text-stone-500">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Worker</th>
-                    <th className="px-3 py-2 font-medium">Role</th>
-                    <th className="px-3 py-2 font-medium">Daily wage</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 text-right font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboard.assigned.map((assignment) => (
-                    <tr
-                      key={assignment.assignment_id}
-                      className="border-t border-stone-100"
-                    >
-                      <td className="px-3 py-2">
-                        <Link
-                          href={`/workers/${assignment.worker.id}`}
-                          className="font-medium text-stone-900 hover:text-amber-700"
-                        >
-                          {assignment.worker.name}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2 text-stone-600">
-                        {WORKER_ROLE_LABELS[assignment.worker.role]}
-                      </td>
-                      <td className="px-3 py-2 text-stone-600 tabular-nums">
-                        {formatLabourCost(assignment.worker.daily_wage)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <WorkerStatusBadge status={assignment.worker.status} />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          disabled={
-                            isPending &&
-                            removingId === assignment.assignment_id
-                          }
-                          onClick={() =>
-                            removeAssignment(
-                              assignment.assignment_id,
-                              assignment.worker.name,
-                            )
-                          }
-                          icon={UserMinus}
-                        >
-                          Remove
-                        </Button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Worker</th>
+                      <th className="px-3 py-2 font-medium">Role</th>
+                      <th className="px-3 py-2 font-medium">Daily wage</th>
+                      <th className="px-3 py-2 font-medium">Today</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {pagedAssigned.map((assignment) => {
+                      const waiting = needsAttendance(assignment);
+
+                      return (
+                        <tr
+                          key={assignment.assignment_id}
+                          className={cn(
+                            "border-t border-stone-100",
+                            waiting && "bg-amber-50/40",
+                          )}
+                        >
+                          <td className="px-3 py-2">
+                            <Link
+                              href={`/workers/${assignment.worker.id}`}
+                              className="font-medium text-stone-900 hover:text-amber-700"
+                            >
+                              {assignment.worker.name}
+                            </Link>
+                            {waiting ? (
+                              <p className="mt-0.5 text-[11px] font-medium text-amber-800">
+                                Waiting for attendance
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-stone-600">
+                            {WORKER_ROLE_LABELS[assignment.worker.role]}
+                          </td>
+                          <td className="px-3 py-2 text-stone-600 tabular-nums">
+                            {formatLabourCost(assignment.worker.daily_wage)}
+                          </td>
+                          <td className="px-3 py-2 text-stone-600">
+                            {assignment.today_attendance
+                              ? ATTENDANCE_STATUS_LABELS[
+                                  assignment.today_attendance.status
+                                ]
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <WorkerStatusBadge
+                              status={assignment.worker.status}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <Link
+                                href={`/projects/${projectId}/labour/attendance`}
+                                className={cn(
+                                  linkButtonClassName(
+                                    waiting ? "primary" : "secondary",
+                                    "sm",
+                                  ),
+                                )}
+                              >
+                                <WithIcon icon={ClipboardCheck}>
+                                  Attendance
+                                </WithIcon>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                disabled={
+                                  isPending &&
+                                  removingId === assignment.assignment_id
+                                }
+                                onClick={() =>
+                                  removeAssignment(
+                                    assignment.assignment_id,
+                                    assignment.worker.name,
+                                  )
+                                }
+                                icon={UserMinus}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {workersPager}
             </div>
 
             <div className="space-y-2 md:hidden">
-              {dashboard.assigned.map((assignment) => (
-                <article
-                  key={assignment.assignment_id}
-                  className="rounded-lg border border-stone-200 bg-stone-50/50 p-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/workers/${assignment.worker.id}`}
-                        className="font-semibold text-stone-900"
-                      >
-                        {assignment.worker.name}
-                      </Link>
-                      <p className="mt-0.5 text-xs text-stone-500">
-                        {WORKER_ROLE_LABELS[assignment.worker.role]} ·{" "}
-                        {formatLabourCost(assignment.worker.daily_wage)}/day
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
+              {pagedAssigned.map((assignment) => {
+                const waiting = needsAttendance(assignment);
+
+                return (
+                  <article
+                    key={assignment.assignment_id}
+                    className={cn(
+                      "rounded-lg border p-3",
+                      waiting
+                        ? "border-amber-200 bg-amber-50/60"
+                        : "border-stone-200 bg-stone-50/50",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/workers/${assignment.worker.id}`}
+                          className="text-sm font-semibold text-stone-900"
+                        >
+                          {assignment.worker.name}
+                        </Link>
+                        {waiting ? (
+                          <p className="mt-0.5 text-[11px] font-medium text-amber-800">
+                            Waiting for attendance
+                          </p>
+                        ) : null}
+                        <p className="mt-0.5 text-xs text-stone-500">
+                          {WORKER_ROLE_LABELS[assignment.worker.role]} ·{" "}
+                          {formatLabourCost(assignment.worker.daily_wage)}/day
+                        </p>
+                      </div>
                       <WorkerStatusBadge status={assignment.worker.status} />
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <dt className="text-stone-500">Today</dt>
+                        <dd className="mt-0.5 font-medium text-stone-800">
+                          {assignment.today_attendance
+                            ? ATTENDANCE_STATUS_LABELS[
+                                assignment.today_attendance.status
+                              ]
+                            : "Unmarked"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-stone-500">Wage</dt>
+                        <dd className="mt-0.5 font-medium text-stone-800 tabular-nums">
+                          {formatLabourCost(assignment.worker.daily_wage)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Link
+                        href={`/projects/${projectId}/labour/attendance`}
+                        className={cn(
+                          linkButtonClassName(
+                            waiting ? "primary" : "secondary",
+                            "sm",
+                          ),
+                          "justify-center",
+                        )}
+                      >
+                        <WithIcon icon={ClipboardCheck}>Attendance</WithIcon>
+                      </Link>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
                         disabled={
-                          isPending && removingId === assignment.assignment_id
+                          isPending &&
+                          removingId === assignment.assignment_id
                         }
                         onClick={() =>
                           removeAssignment(
@@ -406,9 +527,12 @@ export function ProjectLabourScreen({ projectId }: { projectId: string }) {
                         Remove
                       </Button>
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
+              <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+                {workersPager}
+              </div>
             </div>
           </>
         )}

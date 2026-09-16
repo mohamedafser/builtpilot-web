@@ -314,6 +314,7 @@ export function AIFloatingChat() {
       <button
         type="button"
         onClick={toggle}
+        data-tour="ai-floating"
         className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-amber-600 text-white shadow-lg transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
         aria-expanded={isOpen}
         aria-label={isOpen ? "Close BuildPilot AI" : "Open BuildPilot AI"}

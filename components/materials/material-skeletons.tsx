@@ -115,15 +115,23 @@ export function MaterialFormSkeleton() {
 
 export function MaterialDetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-stone-200 bg-white p-5">
-        <Skeleton className="h-8 w-64" />
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-        </div>
+    <div className="space-y-3">
+      <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="mt-2 h-3 w-72" />
       </div>
-      <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-stone-200 bg-stone-200 sm:grid-cols-4">
+        <Skeleton className="h-14 rounded-none bg-white" />
+        <Skeleton className="h-14 rounded-none bg-white" />
+        <Skeleton className="h-14 rounded-none bg-white" />
+        <Skeleton className="h-14 rounded-none bg-white" />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Skeleton className="h-36 rounded-lg" />
+        <Skeleton className="h-36 rounded-lg" />
+        <Skeleton className="h-36 rounded-lg" />
+      </div>
+      <Skeleton className="h-28 w-full rounded-lg" />
     </div>
   );
 }

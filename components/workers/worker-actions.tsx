@@ -1,7 +1,6 @@
 "use client";
 
 import { Button, linkButtonClassName } from "@/components/ui/button";
-import { WithIcon } from "@/components/ui/with-icon";
 import { useDisclosure } from "@/hooks/use-disclosure";
 import { requestJson } from "@/lib/api/client";
 import { showToast } from "@/lib/toast";
@@ -17,6 +16,7 @@ type WorkerActionsProps = {
   workerName: string;
   status: WorkerStatus;
   showView?: boolean;
+  compact?: boolean;
   layout?: "row" | "stack";
 };
 
@@ -25,13 +25,14 @@ export function WorkerActions({
   workerName,
   status,
   showView = true,
+  compact = false,
   layout = "row",
 }: WorkerActionsProps) {
   const router = useRouter();
   const { isOpen, open, close } = useDisclosure();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const inactive = status === "inactive";
+  const inactive = status !== "active";
 
   useEffect(() => {
     if (!isOpen) {
@@ -72,35 +73,57 @@ export function WorkerActions({
     });
   }
 
-  const actionSize = layout === "stack" ? "md" : "sm";
+  const actionSize = layout === "stack" && !compact ? "md" : "sm";
 
   return (
     <>
       <div
         className={cn(
-          "flex gap-2",
+          "flex gap-1",
           layout === "stack"
-            ? "flex-col sm:flex-row"
-            : "flex-wrap items-center",
+            ? "flex-col items-stretch sm:flex-row"
+            : "flex-wrap items-center justify-end",
         )}
       >
         {showView ? (
           <Link
             href={`/workers/${workerId}`}
-            className={linkButtonClassName("secondary", actionSize)}
+            className={cn(
+              linkButtonClassName("secondary", actionSize),
+              compact && "h-8 w-8 px-0",
+            )}
+            aria-label={`View ${workerName}`}
+            title="View"
           >
-            <WithIcon icon={Eye}>View</WithIcon>
+            <Eye className="h-3.5 w-3.5" />
+            {compact ? null : <span>View</span>}
           </Link>
         ) : null}
         <Link
           href={`/workers/${workerId}/edit`}
-          className={linkButtonClassName("secondary", actionSize)}
+          className={cn(
+            linkButtonClassName("secondary", actionSize),
+            compact && "h-8 w-8 px-0",
+          )}
+          aria-label={`Edit ${workerName}`}
+          title="Edit"
         >
-          <WithIcon icon={Pencil}>Edit</WithIcon>
+          <Pencil className="h-3.5 w-3.5" />
+          {compact ? null : <span>Edit</span>}
         </Link>
         <Button
-          variant={inactive ? "secondary" : "danger"}
-          size={actionSize}
+          variant={inactive ? "secondary" : "ghost"}
+          size="sm"
+          className={cn(
+            compact && "h-8 px-2 text-xs",
+            !inactive && "text-red-600 hover:bg-red-50 hover:text-red-700",
+          )}
+          aria-label={
+            inactive
+              ? `Reactivate ${workerName}`
+              : `Deactivate ${workerName}`
+          }
+          title={inactive ? "Reactivate" : "Deactivate"}
           icon={inactive ? RotateCcw : UserX}
           onClick={open}
         >

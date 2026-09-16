@@ -2,11 +2,19 @@
 
 import { signOut } from "@/app/(auth)/actions";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { Logo } from "@/components/layout/logo";
+import {
+  useHasMounted,
+  useTourHighlight,
+} from "@/components/onboarding/tour-highlight-context";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useDisclosure } from "@/hooks/use-disclosure";
 import { requestJson } from "@/lib/api/client";
 import { useLocale } from "@/lib/i18n/locale-context";
+import { NAV_PERMISSIONS, type Permission } from "@/lib/permissions/permissions";
+import { usePermissions } from "@/lib/permissions/permissions-context";
+import type { OrganizationRole } from "@/lib/permissions/roles";
 import { cn, getInitials } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -26,10 +34,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { isMaterialsAttentionPath } from "@/lib/materials/adjustments-seen";
 
 const navItemDefs: {
-  href: string;
+  href: keyof typeof NAV_PERMISSIONS;
   labelKey:
     | "nav.dashboard"
     | "nav.ai"
@@ -41,16 +50,57 @@ const navItemDefs: {
     | "nav.account"
     | "nav.settings";
   icon: LucideIcon;
+  permission: Permission;
 }[] = [
-  { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { href: "/ai", labelKey: "nav.ai", icon: Bot },
-  { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
-  { href: "/quotations", labelKey: "nav.quotations", icon: ClipboardList },
-  { href: "/workers", labelKey: "nav.workers", icon: Users },
-  { href: "/materials", labelKey: "nav.materials", icon: Package },
-  { href: "/vendors", labelKey: "nav.vendors", icon: Building2 },
-  { href: "/settings", labelKey: "nav.settings", icon: Settings },
-  { href: "/account", labelKey: "nav.account", icon: UserRound },
+  {
+    href: "/dashboard",
+    labelKey: "nav.dashboard",
+    icon: LayoutDashboard,
+    permission: NAV_PERMISSIONS["/dashboard"],
+  },
+  { href: "/ai", labelKey: "nav.ai", icon: Bot, permission: NAV_PERMISSIONS["/ai"] },
+  {
+    href: "/projects",
+    labelKey: "nav.projects",
+    icon: FolderKanban,
+    permission: NAV_PERMISSIONS["/projects"],
+  },
+  {
+    href: "/quotations",
+    labelKey: "nav.quotations",
+    icon: ClipboardList,
+    permission: NAV_PERMISSIONS["/quotations"],
+  },
+  {
+    href: "/workers",
+    labelKey: "nav.workers",
+    icon: Users,
+    permission: NAV_PERMISSIONS["/workers"],
+  },
+  {
+    href: "/materials",
+    labelKey: "nav.materials",
+    icon: Package,
+    permission: NAV_PERMISSIONS["/materials"],
+  },
+  {
+    href: "/vendors",
+    labelKey: "nav.vendors",
+    icon: Building2,
+    permission: NAV_PERMISSIONS["/vendors"],
+  },
+  {
+    href: "/settings",
+    labelKey: "nav.settings",
+    icon: Settings,
+    permission: NAV_PERMISSIONS["/settings"],
+  },
+  {
+    href: "/account",
+    labelKey: "nav.account",
+    icon: UserRound,
+    permission: NAV_PERMISSIONS["/account"],
+  },
 ];
 
 function SidebarTooltip({ label }: { label: string }) {
@@ -105,21 +155,46 @@ function NavBadge({
   );
 }
 
-function useWaitingReceiveCount() {
-  const [count, setCount] = useState(0);
+function useNavAttentionCounts() {
+  const [summary, setSummary] = useState({
+    projectsTotal: 0,
+    receiveMaterialPending: 0,
+    reviewLabourPending: 0,
+    adjustedMaterialsCount: 0,
+  });
   const pathname = usePathname();
+  const previousPathname = useRef(pathname);
 
   const refresh = useCallback(async () => {
     const result = await requestJson<{
       receiveMaterialPending: number;
+      reviewLabourPending: number;
+      projectsAttentionPending: number;
+      adjustedMaterialsCount: number;
     }>("/api/project-actions/summary", { notify: false });
 
     if (!result.ok) {
       return;
     }
 
-    setCount(result.data.receiveMaterialPending ?? 0);
+    setSummary({
+      projectsTotal: result.data.projectsAttentionPending ?? 0,
+      receiveMaterialPending: result.data.receiveMaterialPending ?? 0,
+      reviewLabourPending: result.data.reviewLabourPending ?? 0,
+      adjustedMaterialsCount: result.data.adjustedMaterialsCount ?? 0,
+    });
   }, []);
+
+  const markAdjustmentsSeen = useCallback(async () => {
+    const result = await requestJson("/api/materials/adjustments-seen", {
+      method: "POST",
+      notify: false,
+    });
+    if (!result.ok) {
+      return;
+    }
+    await refresh();
+  }, [refresh]);
 
   useEffect(() => {
     void refresh();
@@ -139,39 +214,107 @@ function useWaitingReceiveCount() {
   }, [refresh]);
 
   useEffect(() => {
-    if (pathname.startsWith("/projects") || pathname.startsWith("/dashboard")) {
+    const previous = previousPathname.current;
+    previousPathname.current = pathname;
+
+    const leftMaterialsAttention =
+      isMaterialsAttentionPath(previous) &&
+      !isMaterialsAttentionPath(pathname);
+
+    if (leftMaterialsAttention) {
+      void markAdjustmentsSeen();
+      return;
+    }
+
+    if (
+      pathname.startsWith("/projects") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/workers") ||
+      pathname.startsWith("/materials")
+    ) {
       void refresh();
     }
-  }, [pathname, refresh]);
+  }, [pathname, refresh, markAdjustmentsSeen]);
 
-  return count;
+  return summary;
+}
+
+function projectsAttentionLabel(summary: {
+  receiveMaterialPending: number;
+  reviewLabourPending: number;
+}) {
+  const parts: string[] = [];
+  if (summary.receiveMaterialPending > 0) {
+    parts.push(
+      `${summary.receiveMaterialPending} waiting to receive stock`,
+    );
+  }
+  if (summary.reviewLabourPending > 0) {
+    parts.push(
+      `${summary.reviewLabourPending} waiting for attendance`,
+    );
+  }
+  return parts.join(" · ");
+}
+
+function materialsAttentionLabel(count: number) {
+  if (count <= 0) {
+    return "";
+  }
+  return count === 1
+    ? "1 material stock adjusted"
+    : `${count} materials stock adjusted`;
 }
 
 function NavLinks({
   onNavigate,
   className,
   collapsed,
+  activeTourTarget,
 }: {
   onNavigate?: () => void;
   className?: string;
   collapsed?: boolean;
+  activeTourTarget?: string | null;
 }) {
   const pathname = usePathname();
   const { t } = useLocale();
-  const waitingReceiveCount = useWaitingReceiveCount();
+  const { can, ready } = usePermissions();
+  const hasMounted = useHasMounted();
+  const attention = useNavAttentionCounts();
+
+  const visibleItems = ready
+    ? navItemDefs.filter((item) => can(item.permission))
+    : [];
 
   return (
     <nav className={cn("flex flex-col gap-1", className)}>
-      {navItemDefs.map((item) => {
+      {visibleItems.map((item) => {
         const label = t(item.labelKey);
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
-        const showReceiveBadge =
-          item.href === "/projects" && waitingReceiveCount > 0;
-        const badgeLabel = showReceiveBadge
-          ? `${waitingReceiveCount} waiting to receive stock`
-          : label;
+        const showProjectsBadge =
+          item.href === "/projects" && attention.projectsTotal > 0;
+        const showMaterialsBadge =
+          item.href === "/materials" && attention.adjustedMaterialsCount > 0;
+        const attentionLabel = showProjectsBadge
+          ? projectsAttentionLabel(attention)
+          : showMaterialsBadge
+            ? materialsAttentionLabel(attention.adjustedMaterialsCount)
+            : "";
+        const badgeCount = showProjectsBadge
+          ? attention.projectsTotal
+          : showMaterialsBadge
+            ? attention.adjustedMaterialsCount
+            : 0;
+        const badgeLabel =
+          showProjectsBadge || showMaterialsBadge
+            ? `${label} · ${attentionLabel}`
+            : label;
+        const tourId = `nav${item.href.replace(/\//g, "-")}`;
+        const isTourHighlighted =
+          hasMounted && activeTourTarget === tourId;
 
         return (
           <div key={item.href} className="group relative">
@@ -179,20 +322,31 @@ function NavLinks({
               href={item.href}
               onClick={onNavigate}
               aria-label={badgeLabel}
-              title={showReceiveBadge ? badgeLabel : undefined}
+              title={
+                showProjectsBadge || showMaterialsBadge
+                  ? attentionLabel
+                  : undefined
+              }
+              data-tour={tourId}
+              aria-current={isTourHighlighted ? "step" : undefined}
               className={cn(
-                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
                 collapsed && "lg:justify-center lg:gap-0 lg:px-2 lg:py-2.5",
-                isActive
-                  ? "bg-stone-800 text-white"
-                  : "text-stone-300 hover:bg-stone-800/70 hover:text-white",
+                isTourHighlighted
+                  ? "z-[102] bg-amber-500/25 text-white shadow-lg shadow-amber-500/20 ring-2 ring-amber-400 transition-all duration-300"
+                  : cn(
+                      "transition-colors",
+                      isActive
+                        ? "bg-stone-800 text-white"
+                        : "text-stone-300 hover:bg-stone-800/70 hover:text-white",
+                    ),
               )}
             >
               <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
               <span className={cn(collapsed && "lg:hidden")}>{label}</span>
-              {showReceiveBadge ? (
+              {badgeCount > 0 ? (
                 <NavBadge
-                  count={waitingReceiveCount}
+                  count={badgeCount}
                   collapsed={collapsed}
                   active={isActive}
                 />
@@ -201,8 +355,8 @@ function NavLinks({
             {collapsed ? (
               <SidebarTooltip
                 label={
-                  showReceiveBadge
-                    ? `Projects · ${waitingReceiveCount} waiting to receive`
+                  showProjectsBadge || showMaterialsBadge
+                    ? `${label} · ${attentionLabel}`
                     : label
                 }
               />
@@ -219,17 +373,32 @@ export function Sidebar({
   onToggleCollapsed,
   businessName,
   userName,
+  role: _role,
 }: {
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   businessName?: string | null;
   userName?: string | null;
+  role?: OrganizationRole | null;
 }) {
-  const { isOpen, toggle, close } = useDisclosure();
+  const { isOpen, open, toggle, close } = useDisclosure();
   const { t } = useLocale();
+  const { activeTarget } = useTourHighlight();
+  const hasMounted = useHasMounted();
   const expandLabel = t("nav.expandSidebar");
   const collapseLabel = t("nav.collapseSidebar");
   const signOutLabel = t("nav.signOut");
+
+  useEffect(() => {
+    if (!hasMounted || !activeTarget?.startsWith("nav-")) {
+      return;
+    }
+
+    const isMobile = window.matchMedia("(max-width: 1023px)").matches;
+    if (isMobile) {
+      open();
+    }
+  }, [hasMounted, activeTarget, open]);
 
   return (
     <>
@@ -244,6 +413,7 @@ export function Sidebar({
         </div>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher variant="dark" />
           <NotificationBell />
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-900 text-xs font-semibold text-white">
             {getInitials(userName)}
@@ -312,6 +482,7 @@ export function Sidebar({
         <NavLinks
           onNavigate={close}
           collapsed={collapsed}
+          activeTourTarget={activeTarget}
           className={cn(
             "min-h-0 flex-1",
             collapsed ? "lg:overflow-visible" : "overflow-y-auto",

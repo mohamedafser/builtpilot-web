@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import {
   CompactStatStrip,
   ProjectSectionHeader,
@@ -14,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { WithIcon } from "@/components/ui/with-icon";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/pagination";
 import { useApiData } from "@/hooks/use-api-data";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { formatLabourCost } from "@/lib/labour/money";
 import type { QuotationListResult } from "@/lib/quotations/types";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,7 @@ export function QuotationListScreen({
   projectId?: string;
   projectName?: string;
 }) {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const preset = searchParams.get("preset") ?? "all";
@@ -64,31 +67,33 @@ export function QuotationListScreen({
   return (
     <div className="space-y-4">
       <ProjectSectionHeader
-        title="Quotations"
+        title={t("nav.quotations")}
         description={
           projectName
             ? `Estimates for ${projectName}`
             : "Create, send, and track client estimates"
         }
         action={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={blankHref}
-              className={cn(linkButtonClassName("secondary", "sm"))}
-            >
-              <WithIcon icon={ClipboardList}>Blank quotation</WithIcon>
-            </Link>
-            <ProjectSectionPrimaryLink href={createHref} icon={Plus}>
-              Create quotation
-            </ProjectSectionPrimaryLink>
-          </div>
+          <Can permission="quotations.create">
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={blankHref}
+                className={cn(linkButtonClassName("secondary", "sm"))}
+              >
+                <WithIcon icon={ClipboardList}>{t("quotations.blank")}</WithIcon>
+              </Link>
+              <ProjectSectionPrimaryLink href={createHref} icon={Plus}>
+                {t("quotations.new")}
+              </ProjectSectionPrimaryLink>
+            </div>
+          </Can>
         }
       />
 
       <CompactStatStrip
         stats={[
           {
-            label: "Total",
+            label: t("common.total"),
             value: String(data?.stats.total ?? 0),
           },
           {
@@ -118,24 +123,26 @@ export function QuotationListScreen({
       {isLoading ? (
         <QuotationListSkeleton />
       ) : error ? (
-        <Alert variant="error">{error}</Alert>
+        <Alert variant="error">{t("quotations.loadError")}</Alert>
       ) : total === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title="No quotations yet."
+          title={t("quotations.empty")}
           description={
             hasFilters
               ? "No quotations match these filters."
-              : "Create a quotation from a country template, or start blank."
+              : t("quotations.emptyHint")
           }
           action={
             hasFilters ? null : (
-              <Link
-                href={createHref}
-                className={cn(linkButtonClassName("primary", "sm"))}
-              >
-                <WithIcon icon={Plus}>Create quotation</WithIcon>
-              </Link>
+              <Can permission="quotations.create">
+                <Link
+                  href={createHref}
+                  className={cn(linkButtonClassName("primary", "sm"))}
+                >
+                  <WithIcon icon={Plus}>{t("quotations.new")}</WithIcon>
+                </Link>
+              </Can>
             )
           }
         />

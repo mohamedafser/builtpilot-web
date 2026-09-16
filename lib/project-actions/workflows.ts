@@ -150,20 +150,20 @@ export async function createReviewLabourAction(input: {
     projectId: input.projectId,
     type: "labour",
     actionKey: PROJECT_ACTION_KEYS.REVIEW_LABOUR,
-    title: "New labour assignment",
+    title: "Waiting for attendance",
     description:
       count === 1
-        ? "1 worker was assigned to this project."
-        : `${count} workers were assigned to this project.`,
+        ? "1 worker was assigned — mark today's attendance."
+        : `${count} workers were assigned — mark today's attendance.`,
     href: labourReviewHref(input.projectId),
     metadata: { worker_count: count },
     createdBy: user?.id ?? null,
     notify: {
-      title: "New labour assignment",
+      title: "Workers assigned – mark attendance",
       message:
         count === 1
-          ? "A worker was assigned — review labour on the project."
-          : `${count} workers were assigned — review labour on the project.`,
+          ? "A worker was assigned and is waiting for attendance."
+          : `${count} workers were assigned and are waiting for attendance.`,
       preferenceType: "labour",
     },
   });

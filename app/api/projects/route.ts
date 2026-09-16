@@ -1,6 +1,7 @@
 import { apiError, apiSuccess } from "@/lib/api/response";
 import { parsePagination } from "@/lib/api/pagination";
-import { getApiWorkspace } from "@/lib/api/workspace";
+import { getApiWorkspace, requireApiPermission } from "@/lib/api/workspace";
+import { hasPermission } from "@/lib/permissions";
 import { createProject } from "@/lib/projects/mutations";
 import { getProjects, parseProjectSearchParams } from "@/lib/projects/queries";
 import { revalidatePath } from "next/cache";
@@ -11,6 +12,10 @@ export async function GET(request: NextRequest) {
 
   if (!workspace.ok) {
     return apiError(workspace.message, workspace.status);
+  }
+
+  if (!hasPermission(workspace.role, "projects.view")) {
+    return apiError("You do not have permission for this action.", 403);
   }
 
   const { searchParams } = request.nextUrl;
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const workspace = await getApiWorkspace();
+  const workspace = await requireApiPermission("projects.create");
 
   if (!workspace.ok) {
     return apiError(workspace.message, workspace.status);

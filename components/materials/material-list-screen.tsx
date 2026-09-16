@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import { MaterialList } from "@/components/materials/material-list";
 import { MaterialListSkeleton } from "@/components/materials/material-skeletons";
 import { Alert } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { WithIcon } from "@/components/ui/with-icon";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/pagination";
 import { requestJson } from "@/lib/api/client";
+import { useLocale } from "@/lib/i18n/locale-context";
 import type { MaterialListItem } from "@/lib/materials/types";
 import { cn } from "@/lib/utils";
 import { FilterX, Package, Plus } from "lucide-react";
@@ -23,9 +25,8 @@ type MaterialListResponse = {
   totalPages: number;
 };
 
-type VendorOption = { id: string; name: string };
-
 export function MaterialListScreen() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -34,7 +35,6 @@ export function MaterialListScreen() {
   const pageSize = searchParams.get("page_size") ?? String(DEFAULT_PAGE_SIZE);
 
   const [result, setResult] = useState<MaterialListResponse | null>(null);
-  const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,12 +52,9 @@ export function MaterialListScreen() {
       params.set("page", page);
       params.set("page_size", pageSize);
 
-      const [materialsResponse, vendorsResponse] = await Promise.all([
-        requestJson<MaterialListResponse>(
-          `/api/materials?${params.toString()}`,
-        ),
-        requestJson<{ vendors: VendorOption[] }>("/api/vendors/active"),
-      ]);
+      const materialsResponse = await requestJson<MaterialListResponse>(
+        `/api/materials?${params.toString()}`,
+      );
 
       if (cancelled) {
         return;
@@ -71,14 +68,6 @@ export function MaterialListScreen() {
       }
 
       setResult(materialsResponse.data);
-      setVendors(
-        vendorsResponse.ok
-          ? vendorsResponse.data.vendors.map((vendor) => ({
-              id: vendor.id,
-              name: vendor.name,
-            }))
-          : [],
-      );
       setIsLoading(false);
     }
 
@@ -94,7 +83,7 @@ export function MaterialListScreen() {
   }
 
   if (error) {
-    return <Alert variant="error">{error}</Alert>;
+    return <Alert variant="error">{t("materials.loadError")}</Alert>;
   }
 
   const materials = result?.materials ?? [];
@@ -105,11 +94,11 @@ export function MaterialListScreen() {
     return (
       <EmptyState
         icon={Package}
-        title={hasActiveFilters ? "No matching materials" : "No materials yet"}
+        title={hasActiveFilters ? "No matching materials" : t("materials.empty")}
         description={
           hasActiveFilters
             ? "Try a different search, category, or status filter."
-            : "Add your own catalog items to get started."
+            : t("materials.emptyHint")
         }
         action={
           hasActiveFilters ? (
@@ -117,15 +106,17 @@ export function MaterialListScreen() {
               href="/materials"
               className={cn(linkButtonClassName("secondary"))}
             >
-              <WithIcon icon={FilterX}>Clear filters</WithIcon>
+              <WithIcon icon={FilterX}>{t("common.clearFilters")}</WithIcon>
             </Link>
           ) : (
-            <Link
-              href="/materials/new"
-              className={cn(linkButtonClassName("secondary", "sm"))}
-            >
-              <WithIcon icon={Plus}>Add material</WithIcon>
-            </Link>
+            <Can permission="materials.create">
+              <Link
+                href="/materials/new"
+                className={cn(linkButtonClassName("secondary", "sm"))}
+              >
+                <WithIcon icon={Plus}>{t("materials.new")}</WithIcon>
+              </Link>
+            </Can>
           )
         }
       />
@@ -135,7 +126,6 @@ export function MaterialListScreen() {
   return (
     <MaterialList
       materials={materials}
-      vendors={vendors}
       pagination={{
         page: result?.page ?? 1,
         pageSize: result?.pageSize ?? DEFAULT_PAGE_SIZE,

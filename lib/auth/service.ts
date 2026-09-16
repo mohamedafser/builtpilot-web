@@ -15,6 +15,8 @@ import {
   issueAndSendEmailOtp,
   verifyEmailOtpCode,
 } from "@/lib/auth/email-otp";
+import { ensureUserWorkspace } from "@/lib/auth/organization-setup";
+import { ensureWorkspaceForAuthenticatedUser } from "@/lib/team/service";
 import {
   createPendingEmailVerification,
   EMAIL_OTP_MAX_ATTEMPTS,
@@ -27,6 +29,7 @@ import {
   readPendingPasswordReset,
   writePendingPasswordReset,
 } from "@/lib/auth/password-reset-cookie";
+import { getCurrentMembership } from "@/lib/auth";
 import { getAuthErrorMessage, logAuthError } from "@/lib/auth/errors";
 import { resolveAuthOrigin } from "@/lib/app-url";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -228,6 +231,20 @@ export async function performLogin(
 
   await clearPendingEmailVerification();
 
+  const {
+    data: { user: signedInUser },
+  } = await supabase.auth.getUser();
+
+  if (signedInUser) {
+    const membership = await getCurrentMembership();
+    if (!membership) {
+      const workspace = await ensureWorkspaceForAuthenticatedUser(signedInUser);
+      if (!workspace.ok) {
+        logAuthError("login-workspace-setup", { message: workspace.message });
+      }
+    }
+  }
+
   return ok("Signed in successfully.", {
     redirectTo: safeNextPath(nextPath),
   });
@@ -326,8 +343,8 @@ export async function performSignup(
       user_metadata: {
         full_name: parsed.data.full_name,
         business_name: parsed.data.business_name,
-        country_code: parsed.data.country_code,
-        language: parsed.data.language,
+        country_code: "IN",
+        language: "en",
       },
     });
 
@@ -360,8 +377,8 @@ export async function performSignup(
     user_metadata: {
       full_name: parsed.data.full_name,
       business_name: parsed.data.business_name,
-      country_code: parsed.data.country_code,
-      language: parsed.data.language,
+      country_code: "IN",
+      language: "en",
     },
   });
 
@@ -523,6 +540,39 @@ export async function performVerifySignupOtp(
     return fail(AUTH_MESSAGES.verifyOtpFailed);
   }
 
+  const admin = requireAdminOrFail();
+  let signupMetadata: Record<string, unknown> = {};
+  if (admin) {
+    const { data: authUser } = await admin.auth.admin.getUserById(
+      pending.userId,
+    );
+    signupMetadata = authUser.user?.user_metadata ?? {};
+  }
+
+  const workspace = await ensureUserWorkspace(pending.userId, email, {
+    full_name:
+      typeof signupMetadata.full_name === "string"
+        ? signupMetadata.full_name
+        : null,
+    business_name:
+      typeof signupMetadata.business_name === "string"
+        ? signupMetadata.business_name
+        : null,
+    country_code:
+      typeof signupMetadata.country_code === "string"
+        ? signupMetadata.country_code
+        : null,
+    language:
+      typeof signupMetadata.language === "string"
+        ? signupMetadata.language
+        : null,
+  });
+
+  if (!workspace.ok) {
+    logAuthError("workspace-setup", { message: workspace.error });
+    return fail(AUTH_MESSAGES.verifyOtpFailed);
+  }
+
   const sessionLink = await createSessionForEmail(email);
   if (sessionLink.error || !sessionLink.tokenHash) {
     logAuthError(
@@ -551,7 +601,7 @@ export async function performVerifySignupOtp(
   }
 
   return ok(AUTH_MESSAGES.verifyOtpSuccess, {
-    redirectTo: "/dashboard",
+    redirectTo: "/dashboard?welcome=1",
   });
 }
 

@@ -5,6 +5,11 @@ export type ProjectWorkerAssignment = AssignedProject & {
   worker: Worker;
 };
 
+/** Assigned worker row on the labour dashboard, with today's attendance mark. */
+export type ProjectLabourAssignmentRow = ProjectWorkerAssignment & {
+  today_attendance: AttendanceSheetRow["attendance"];
+};
+
 export type AttendanceSheetRow = {
   worker: Worker;
   assignment_id: string;
@@ -50,7 +55,7 @@ export type LabourTodayStats = {
 };
 
 export type ProjectLabourDashboard = {
-  assigned: ProjectWorkerAssignment[];
+  assigned: ProjectLabourAssignmentRow[];
   today: LabourTodayStats;
   summary: LabourSummary;
 };

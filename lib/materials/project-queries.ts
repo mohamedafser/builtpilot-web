@@ -1,4 +1,5 @@
 import { startOfMonthIso, todayIsoDate } from "@/lib/labour/money";
+import { readMaterialsAdjustmentsSeenAt } from "@/lib/materials/adjustments-seen-server";
 import { getMaterialErrorMessage, isUuid } from "@/lib/materials/helpers";
 import {
   averageUnitPricePaise,
@@ -380,6 +381,73 @@ export async function getProjectMaterialsDashboard(
     }
   }
 
+  const adjustmentsSeenAt = await readMaterialsAdjustmentsSeenAt();
+  let adjustmentsQuery = supabase
+    .from("material_transactions")
+    .select(
+      `
+        material_id,
+        quantity,
+        adjustment_direction,
+        transaction_date,
+        created_at
+      `,
+    )
+    .eq("business_id", projectResult.project.business_id)
+    .eq("project_id", projectId)
+    .eq("transaction_type", "adjusted")
+    .order("transaction_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (adjustmentsSeenAt) {
+    adjustmentsQuery = adjustmentsQuery.gt("created_at", adjustmentsSeenAt);
+  }
+
+  const { data: adjustments, error: adjustmentsError } = await adjustmentsQuery;
+
+  if (adjustmentsError) {
+    return { dashboard: null, error: getMaterialErrorMessage(adjustmentsError) };
+  }
+
+  const lastAdjustmentByMaterial = new Map<
+    string,
+    {
+      direction: "increase" | "decrease";
+      quantity: string;
+      date: string;
+    }
+  >();
+  const adjustedIncreaseByMaterial = new Map<string, number>();
+  const adjustedDecreaseByMaterial = new Map<string, number>();
+
+  for (const row of adjustments ?? []) {
+    const direction = row.adjustment_direction;
+    if (direction !== "increase" && direction !== "decrease") {
+      continue;
+    }
+
+    const qtyMilli = milli(row.quantity);
+    if (direction === "increase") {
+      adjustedIncreaseByMaterial.set(
+        row.material_id,
+        (adjustedIncreaseByMaterial.get(row.material_id) ?? 0) + qtyMilli,
+      );
+    } else {
+      adjustedDecreaseByMaterial.set(
+        row.material_id,
+        (adjustedDecreaseByMaterial.get(row.material_id) ?? 0) + qtyMilli,
+      );
+    }
+
+    if (!lastAdjustmentByMaterial.has(row.material_id)) {
+      lastAdjustmentByMaterial.set(row.material_id, {
+        direction,
+        quantity: formatMilli(qtyMilli),
+        date: row.transaction_date,
+      });
+    }
+  }
+
   const assigned: ProjectMaterialRow[] = (
     (assignedRows ?? []) as ProjectMaterialJoin[]
   ).flatMap((row) => {
@@ -412,6 +480,13 @@ export async function getProjectMaterialsDashboard(
         total_received: formatMilli(receivedMilli),
         total_used: formatMilli(usedMilli),
         total_returned: formatMilli(returnedMilli),
+        total_adjusted_increase: formatMilli(
+          adjustedIncreaseByMaterial.get(material.id) ?? 0,
+        ),
+        total_adjusted_decrease: formatMilli(
+          adjustedDecreaseByMaterial.get(material.id) ?? 0,
+        ),
+        last_adjustment: lastAdjustmentByMaterial.get(material.id) ?? null,
         latest_unit_price:
           latestPrice.get(material.id) ?? material.default_unit_price,
         vendor_name: vendorNames.get(material.id)?.join(", ") ?? null,
@@ -419,6 +494,23 @@ export async function getProjectMaterialsDashboard(
         total_purchased_cost: formatPaise(purchasedPaise),
       },
     ];
+  });
+
+  assigned.sort((a, b) => {
+    const aAdjusted = a.last_adjustment ? 1 : 0;
+    const bAdjusted = b.last_adjustment ? 1 : 0;
+    if (aAdjusted !== bAdjusted) {
+      return bAdjusted - aAdjusted;
+    }
+
+    if (a.last_adjustment && b.last_adjustment) {
+      const byDate = b.last_adjustment.date.localeCompare(a.last_adjustment.date);
+      if (byDate !== 0) {
+        return byDate;
+      }
+    }
+
+    return a.material.name.localeCompare(b.material.name);
   });
 
   const { data: recentRows, error: recentError } = await supabase

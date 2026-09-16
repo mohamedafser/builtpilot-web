@@ -1,10 +1,14 @@
+"use client";
+
 import {
   Building2,
   ClipboardList,
   FileText,
-  Package,
   Sparkles,
+  Users,
 } from "lucide-react";
+import { useLocale } from "@/lib/i18n/locale-context";
+import type { MessageKey } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
 const orbitIcons = [
@@ -19,18 +23,26 @@ const orbitIcons = [
     className: "landing-orbit-2 right-[6%] top-[18%]",
   },
   {
-    icon: Package,
-    label: "Materials",
+    icon: Users,
+    label: "Team",
     className: "landing-orbit-3 left-[4%] bottom-[22%]",
   },
   {
     icon: FileText,
-    label: "Quotations",
+    label: "Quotes",
     className: "landing-orbit-4 right-[10%] bottom-[16%]",
   },
 ];
 
+const showcaseStats: { labelKey: MessageKey; value: string }[] = [
+  { labelKey: "landing.showcaseProjects", value: "12" },
+  { labelKey: "landing.showcaseTeam", value: "08" },
+  { labelKey: "landing.showcaseQuotes", value: "05" },
+];
+
 export function AnimatedShowcase() {
+  const { t } = useLocale();
+
   return (
     <div className="relative mx-auto aspect-square w-full max-w-md">
       <div className="landing-showcase-glow absolute inset-8 rounded-full bg-amber-300/25 blur-3xl" />
@@ -73,20 +85,16 @@ export function AnimatedShowcase() {
           </div>
 
           <div className="relative mt-5 space-y-2.5">
-            {[
-              { label: "Active projects", value: "12" },
-              { label: "Pending tasks", value: "08" },
-              { label: "Cost alerts", value: "03" },
-            ].map((item, index) => (
+            {showcaseStats.map((item, index) => (
               <div
-                key={item.label}
+                key={item.labelKey}
                 className={cn(
                   "landing-showcase-stat flex items-center justify-between rounded-xl border border-stone-200/80 bg-stone-50/80 px-3 py-2.5",
                   index === 1 && "landing-showcase-stat-delay-1",
                   index === 2 && "landing-showcase-stat-delay-2",
                 )}
               >
-                <span className="text-xs text-stone-600">{item.label}</span>
+                <span className="text-xs text-stone-600">{t(item.labelKey)}</span>
                 <span className="text-sm font-bold text-stone-900">
                   {item.value}
                 </span>

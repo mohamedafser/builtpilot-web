@@ -1,37 +1,95 @@
-import { WorkspacePreferencesForm } from "@/components/settings/workspace-preferences-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrganizationSettingsForm } from "@/components/settings/organization-settings-form";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
+import { TeamManagement } from "@/components/settings/team-management";
+import { UserPreferencesForm } from "@/components/settings/user-preferences-form";
 import { getWorkspaceContext } from "@/lib/auth";
 import {
   DEFAULT_LANGUAGE,
   normalizeCountryCode,
   normalizeLanguage,
 } from "@/lib/i18n/config";
-import { translate } from "@/lib/i18n/messages";
+import { formatOrganizationRole, hasPermission } from "@/lib/permissions";
+import { listTeamMembers } from "@/lib/team/service";
 
 export default async function SettingsPage() {
-  const { profile, business } = await getWorkspaceContext();
+  const { profile, business, role, user } = await getWorkspaceContext();
   const language = normalizeLanguage(profile?.language ?? DEFAULT_LANGUAGE);
+  const canViewTeam = hasPermission(role, "organization.users.view");
+  const canManageWorkspace = hasPermission(role, "organization.settings.manage");
+
+  const teamResult =
+    business && canViewTeam ? await listTeamMembers(user) : null;
+
+  const teamData =
+    teamResult?.ok === true
+      ? teamResult.data
+      : { members: [], invitations: [] };
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>{translate(language, "settings.title")}</CardTitle>
-        <p className="mt-1 text-sm text-stone-500">
-          {translate(language, "settings.subtitle")}
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div>
+        <p className="text-sm text-stone-500">
+          Manage your organization, team access, and personal preferences.
         </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-stone-600">
-          {translate(language, "settings.workspace")}:{" "}
-          <span className="font-medium text-stone-800">
-            {business?.name ?? "—"}
-          </span>
-        </p>
-        <WorkspacePreferencesForm
-          initialLanguage={language}
-          initialCountryCode={normalizeCountryCode(business?.country_code)}
-        />
-      </CardContent>
-    </Card>
+      </div>
+
+      <SettingsTabs
+        showTeam={canViewTeam}
+        defaultTab={canViewTeam ? "organization" : "preferences"}
+        organization={
+          <div className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-stone-200 bg-stone-50/70 px-3 py-2.5">
+                <p className="text-xs text-stone-500">Organization</p>
+                <p className="text-sm font-medium text-stone-900">
+                  {business?.name ?? "—"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-stone-200 bg-stone-50/70 px-3 py-2.5">
+                <p className="text-xs text-stone-500">Your role</p>
+                <p className="text-sm font-medium text-stone-900">
+                  {formatOrganizationRole(role)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-stone-900">
+                Workspace region
+              </h3>
+              <OrganizationSettingsForm
+                initialLanguage={language}
+                initialCountryCode={normalizeCountryCode(business?.country_code)}
+                canManageWorkspace={canManageWorkspace}
+              />
+            </div>
+          </div>
+        }
+        team={
+          <TeamManagement
+            initialData={teamData}
+            currentUserId={user.id}
+            canInvite={hasPermission(role, "organization.users.invite")}
+            canManageRoles={hasPermission(role, "organization.roles.manage")}
+            canRemoveMembers={hasPermission(role, "organization.users.manage")}
+            showRoleGuide={
+              role === "owner" || role === "admin"
+            }
+          />
+        }
+        preferences={
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-stone-900">
+              Personal settings
+            </h3>
+            <p className="text-xs text-stone-500">
+              Language applies to your account only and does not change the
+              organization workspace.
+            </p>
+            <UserPreferencesForm initialLanguage={language} />
+          </div>
+        }
+      />
+    </div>
   );
 }

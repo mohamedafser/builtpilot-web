@@ -1,16 +1,11 @@
-import {
-  isMaterialTransactionType,
-} from "@/constants/material";
+import { isMaterialTransactionType } from "@/constants/material";
 import {
   paginationMeta,
   parsePagination,
   type Pagination,
   type PaginationMeta,
 } from "@/lib/api/pagination";
-import {
-  getMaterialErrorMessage,
-  isUuid,
-} from "@/lib/materials/helpers";
+import { getMaterialErrorMessage, isUuid } from "@/lib/materials/helpers";
 import { parseQuantityToMilli } from "@/lib/materials/stock";
 import type {
   MaterialTransactionFilters,
@@ -18,12 +13,10 @@ import type {
 } from "@/lib/materials/types";
 import { getProjectById, getWorkspaceScope } from "@/lib/projects/queries";
 import { createClient } from "@/lib/supabase/server";
-import type {
-  MaterialTransaction,
-  MaterialUnit,
-} from "@/types";
+import type { MaterialTransaction, MaterialUnit } from "@/types";
 
-type NamedJoin = { id: string; name: string } | { id: string; name: string }[] | null;
+type NamedJoin =
+  { id: string; name: string } | { id: string; name: string }[] | null;
 type MaterialJoin =
   | { id: string; name: string; unit: MaterialUnit }
   | { id: string; name: string; unit: MaterialUnit }[]
@@ -65,8 +58,12 @@ export function mapTransactionRows(
       return [];
     }
 
-    const { materials: _materials, projects: _projects, vendors: _vendors, ...transaction } =
-      row;
+    const {
+      materials: _materials,
+      projects: _projects,
+      vendors: _vendors,
+      ...transaction
+    } = row;
     void _materials;
     void _projects;
     void _vendors;

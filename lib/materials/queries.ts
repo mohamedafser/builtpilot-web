@@ -6,6 +6,7 @@ import {
   type Pagination,
   type PaginationMeta,
 } from "@/lib/api/pagination";
+import { readMaterialsAdjustmentsSeenAt } from "@/lib/materials/adjustments-seen-server";
 import {
   getMaterialErrorMessage,
   isUuid,
@@ -132,17 +133,19 @@ export async function getMaterials(
   }
 
   const supabase = await createClient();
-  let query = supabase
+
+  // Load filtered ids first so we can put adjusted materials ahead of pagination.
+  let idQuery = supabase
     .from("materials")
-    .select("*, vendors ( id, name )", { count: "exact" })
+    .select("id, name")
     .eq("business_id", scope.business.id);
 
   if (filters.status) {
-    query = query.eq("status", filters.status);
+    idQuery = idQuery.eq("status", filters.status);
   }
 
   if (filters.category) {
-    query = query.eq("category", filters.category);
+    idQuery = idQuery.eq("category", filters.category);
   }
 
   const search = filters.query ? sanitizeSearchTerm(filters.query) : "";
@@ -153,29 +156,160 @@ export async function getMaterials(
       : null;
 
     if (categoryMatch && !filters.category) {
-      query = query.or(`name.ilike.%${search}%,category.eq.${categoryMatch}`);
+      idQuery = idQuery.or(
+        `name.ilike.%${search}%,category.eq.${categoryMatch}`,
+      );
     } else {
-      query = query.ilike("name", `%${search}%`);
+      idQuery = idQuery.ilike("name", `%${search}%`);
     }
   }
 
-  const { data, error, count } = await query
-    .order("name", { ascending: true })
-    .range(pagination.from, pagination.to);
+  const { data: idRows, error: idError } = await idQuery.order("name", {
+    ascending: true,
+  });
+
+  if (idError) {
+    return { ...empty, error: getMaterialErrorMessage(idError) };
+  }
+
+  const allIds = (idRows ?? []).map((row) => row.id);
+  const total = allIds.length;
+
+  if (total === 0) {
+    return {
+      ...empty,
+      ...paginationMeta(pagination.page, pagination.pageSize, 0),
+    };
+  }
+
+  const adjustmentsSeenAt = await readMaterialsAdjustmentsSeenAt();
+  let allAdjustmentsQuery = supabase
+    .from("material_transactions")
+    .select(
+      "material_id, quantity, adjustment_direction, transaction_date, created_at",
+    )
+    .eq("business_id", scope.business.id)
+    .eq("transaction_type", "adjusted")
+    .order("transaction_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (adjustmentsSeenAt) {
+    allAdjustmentsQuery = allAdjustmentsQuery.gt(
+      "created_at",
+      adjustmentsSeenAt,
+    );
+  }
+
+  const { data: allAdjustments, error: allAdjustmentsError } =
+    await allAdjustmentsQuery;
+
+  if (allAdjustmentsError) {
+    return { ...empty, error: getMaterialErrorMessage(allAdjustmentsError) };
+  }
+
+  const filteredIdSet = new Set(allIds);
+  const lastAdjustmentByMaterial = new Map<
+    string,
+    {
+      direction: "increase" | "decrease";
+      quantity: string;
+      date: string;
+    }
+  >();
+  const adjustedIncreaseByMaterial = new Map<string, number>();
+  const adjustedDecreaseByMaterial = new Map<string, number>();
+  const latestAdjustmentSortKey = new Map<string, string>();
+
+  for (const row of allAdjustments ?? []) {
+    if (!filteredIdSet.has(row.material_id)) {
+      continue;
+    }
+
+    const direction = row.adjustment_direction;
+    if (direction !== "increase" && direction !== "decrease") {
+      continue;
+    }
+
+    const qtyMilli = milliFromNumeric(row.quantity);
+    if (direction === "increase") {
+      adjustedIncreaseByMaterial.set(
+        row.material_id,
+        (adjustedIncreaseByMaterial.get(row.material_id) ?? 0) + qtyMilli,
+      );
+    } else {
+      adjustedDecreaseByMaterial.set(
+        row.material_id,
+        (adjustedDecreaseByMaterial.get(row.material_id) ?? 0) + qtyMilli,
+      );
+    }
+
+    if (!lastAdjustmentByMaterial.has(row.material_id)) {
+      lastAdjustmentByMaterial.set(row.material_id, {
+        direction,
+        quantity: formatMilli(qtyMilli),
+        date: row.transaction_date,
+      });
+      latestAdjustmentSortKey.set(
+        row.material_id,
+        `${row.transaction_date}T${row.created_at}`,
+      );
+    }
+  }
+
+  const nameById = new Map((idRows ?? []).map((row) => [row.id, row.name]));
+  const sortedIds = [...allIds].sort((a, b) => {
+    const aAdjusted = lastAdjustmentByMaterial.has(a) ? 1 : 0;
+    const bAdjusted = lastAdjustmentByMaterial.has(b) ? 1 : 0;
+    if (aAdjusted !== bAdjusted) {
+      return bAdjusted - aAdjusted;
+    }
+
+    if (aAdjusted && bAdjusted) {
+      const aKey = latestAdjustmentSortKey.get(a) ?? "";
+      const bKey = latestAdjustmentSortKey.get(b) ?? "";
+      if (aKey !== bKey) {
+        return bKey.localeCompare(aKey);
+      }
+    }
+
+    return (nameById.get(a) ?? "").localeCompare(nameById.get(b) ?? "");
+  });
+
+  const pageIds = sortedIds.slice(pagination.from, pagination.from + pagination.pageSize);
+
+  if (pageIds.length === 0) {
+    return {
+      ...empty,
+      ...paginationMeta(pagination.page, pagination.pageSize, total),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("materials")
+    .select("*, vendors ( id, name )")
+    .eq("business_id", scope.business.id)
+    .in("id", pageIds);
 
   if (error) {
     return { ...empty, error: getMaterialErrorMessage(error) };
   }
 
-  const materials = ((data ?? []) as (Material & { vendors: NamedJoin })[]).map(
-    (row) => {
+  const materialsById = new Map(
+    ((data ?? []) as (Material & { vendors: NamedJoin })[]).map((row) => {
       const { vendors, ...material } = row;
-      return {
-        ...material,
-        vendor_name: nameFromJoin(vendors),
-      };
-    },
+      return [
+        material.id,
+        {
+          ...material,
+          vendor_name: nameFromJoin(vendors),
+        },
+      ] as const;
+    }),
   );
+
+  const materials = pageIds
+    .map((id) => materialsById.get(id))
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
   const materialIds = materials.map((row) => row.id);
   const balancesByMaterial = new Map<string, MaterialStockBalance[]>();
 
@@ -213,10 +347,17 @@ export async function getMaterials(
         current_stock: summary.current_stock,
         stock_status: summary.stock_status,
         vendor_name: material.vendor_name,
+        total_adjusted_increase: formatMilli(
+          adjustedIncreaseByMaterial.get(material.id) ?? 0,
+        ),
+        total_adjusted_decrease: formatMilli(
+          adjustedDecreaseByMaterial.get(material.id) ?? 0,
+        ),
+        last_adjustment: lastAdjustmentByMaterial.get(material.id) ?? null,
       };
     }),
     error: null,
-    ...paginationMeta(pagination.page, pagination.pageSize, count ?? 0),
+    ...paginationMeta(pagination.page, pagination.pageSize, total),
   };
 }
 

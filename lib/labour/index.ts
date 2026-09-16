@@ -18,6 +18,7 @@ export type {
   AttendanceSheetRow,
   LabourSummary,
   LabourTodayStats,
+  ProjectLabourAssignmentRow,
   ProjectLabourDashboard,
   ProjectWorkerAssignment,
   RoleLabourTotal,

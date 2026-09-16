@@ -4,9 +4,9 @@ import { BoqItemCard } from "@/components/boq/boq-item-card";
 import { BoqDetailSkeleton } from "@/components/boq/boq-skeletons";
 import { MeasurementForm } from "@/components/boq/measurement-form";
 import { MeasurementHistory } from "@/components/boq/measurement-history";
+import { CompactPanel } from "@/components/projects/project-section-chrome";
 import { Alert } from "@/components/ui/alert";
 import { linkButtonClassName } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useApiData } from "@/hooks/use-api-data";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/pagination";
@@ -96,19 +96,14 @@ export function BoqItemDetailScreen({
       />
 
       {canMeasure ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add measurement</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MeasurementForm
-              projectId={projectId}
-              boqId={boqId}
-              item={data.item}
-              onSaved={() => setTick((current) => current + 1)}
-            />
-          </CardContent>
-        </Card>
+        <CompactPanel title="Add measurement">
+          <MeasurementForm
+            projectId={projectId}
+            boqId={boqId}
+            item={data.item}
+            onSaved={() => setTick((current) => current + 1)}
+          />
+        </CompactPanel>
       ) : (
         <Alert>
           Measurements can only be added to draft or active BOQs.

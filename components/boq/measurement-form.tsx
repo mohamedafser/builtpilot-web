@@ -82,79 +82,100 @@ export function MeasurementForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Remaining quantity: {remaining} {BOQ_UNIT_SHORT_LABELS[item.unit]}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-2.5">
+      <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
+        Remaining: {remaining} {BOQ_UNIT_SHORT_LABELS[item.unit]}
+      </p>
+
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <Label htmlFor="measurement_date">Measurement date</Label>
+          <Label htmlFor="measurement_date" className="text-xs">
+            Date
+          </Label>
           <Input
             id="measurement_date"
             type="date"
-            className="h-12 text-base sm:h-10 sm:text-sm"
+            className="mt-1 h-9 text-sm"
             error={Boolean(errors.measurement_date)}
             {...register("measurement_date")}
           />
         </div>
         <div>
-          <Label htmlFor="quantity">Quantity</Label>
+          <Label htmlFor="quantity" className="text-xs">
+            Quantity ({BOQ_UNIT_SHORT_LABELS[item.unit]})
+          </Label>
           <Input
             id="quantity"
             inputMode="decimal"
-            className="h-14 text-xl sm:h-12 sm:text-lg"
+            className="mt-1 h-9 text-sm"
             error={Boolean(errors.quantity)}
             {...register("quantity")}
           />
-          <p className="mt-1 text-xs text-stone-500">
-            Unit: {BOQ_UNIT_SHORT_LABELS[item.unit]}
-          </p>
           {errors.quantity ? (
-            <p className="mt-1 text-sm text-red-600">
+            <p className="mt-1 text-xs text-red-600">
               {errors.quantity.message}
             </p>
           ) : null}
         </div>
+        <div>
+          <Label htmlFor="location" className="text-xs">
+            Location
+          </Label>
+          <Input
+            id="location"
+            placeholder="Ground Floor - East Wall"
+            className="mt-1 h-9 text-sm"
+            {...register("location")}
+          />
+        </div>
+        <div>
+          <Label htmlFor="reference" className="text-xs">
+            Reference
+          </Label>
+          <Input
+            id="reference"
+            className="mt-1 h-9 text-sm"
+            {...register("reference")}
+          />
+        </div>
       </div>
-      <div>
-        <Label htmlFor="location">Location</Label>
-        <Input
-          id="location"
-          placeholder="Ground Floor - East Wall"
-          className="h-12 text-base sm:h-10 sm:text-sm"
-          {...register("location")}
-        />
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="description" className="text-xs">
+            Description
+          </Label>
+          <Input
+            id="description"
+            placeholder="Completed brickwork"
+            className="mt-1 h-9 text-sm"
+            {...register("description")}
+          />
+        </div>
+        <div>
+          <Label htmlFor="notes" className="text-xs">
+            Notes
+          </Label>
+          <Textarea
+            id="notes"
+            rows={2}
+            className="mt-1 min-h-0 resize-y text-sm"
+            {...register("notes")}
+          />
+        </div>
       </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Input
-          id="description"
-          placeholder="Completed brickwork"
-          className="h-12 text-base sm:h-10 sm:text-sm"
-          {...register("description")}
-        />
+
+      <div className="flex justify-end">
+        <Button
+          type="submit"
+          size="sm"
+          className="h-9"
+          disabled={isSubmitting}
+          icon={Save}
+        >
+          {isSubmitting ? "Saving..." : "Save measurement"}
+        </Button>
       </div>
-      <div>
-        <Label htmlFor="reference">Reference</Label>
-        <Input
-          id="reference"
-          className="h-12 text-base sm:h-10 sm:text-sm"
-          {...register("reference")}
-        />
-      </div>
-      <div>
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea id="notes" {...register("notes")} />
-      </div>
-      <Button
-        type="submit"
-        fullWidth
-        className="h-14 text-base"
-        disabled={isSubmitting}
-        icon={Save}
-      >
-        {isSubmitting ? "Saving..." : "Save measurement"}
-      </Button>
     </form>
   );
 }

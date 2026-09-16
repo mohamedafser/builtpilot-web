@@ -32,9 +32,8 @@ export const getCurrentSession = cache(async (): Promise<Session | null> => {
     error,
   } = await supabase.auth.getSession();
 
-  if (error) {
+  if (error && !isAuthSessionMissingError(error)) {
     console.error("[auth:getCurrentSession]", error.message);
-    return null;
   }
 
   return session;
@@ -47,13 +46,26 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     error,
   } = await supabase.auth.getUser();
 
-  if (error) {
+  // Expected on public auth pages when no cookie/session exists.
+  if (error && !isAuthSessionMissingError(error)) {
     console.error("[auth:getCurrentUser]", error.message);
-    return null;
   }
 
   return user;
 });
+
+function isAuthSessionMissingError(error: {
+  message?: string;
+  name?: string;
+  code?: string;
+}) {
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("auth session missing") ||
+    error.name === "AuthSessionMissingError" ||
+    error.code === "session_not_found"
+  );
+}
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const user = await getCurrentUser();

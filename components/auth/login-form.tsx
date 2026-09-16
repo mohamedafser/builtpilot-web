@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { requestJson } from "@/lib/api/client";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { loginSchema, type LoginValues } from "@/lib/validations/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn } from "lucide-react";
@@ -22,8 +23,15 @@ type LoginResponse = {
   retryAfterSeconds?: number;
 };
 
-export function LoginForm({ nextPath }: { nextPath?: string }) {
+export function LoginForm({
+  nextPath,
+  initialEmail,
+}: {
+  nextPath?: string;
+  initialEmail?: string;
+}) {
   const router = useRouter();
+  const { t } = useLocale();
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -32,7 +40,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      email: initialEmail ?? "",
       password: "",
     },
   });
@@ -65,7 +73,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       {formError ? <Alert variant="error">{formError}</Alert> : null}
 
       <div>
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("auth.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -83,13 +91,13 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-3">
           <Label htmlFor="password" className="mb-0">
-            Password
+            {t("auth.password")}
           </Label>
           <Link
             href="/forgot-password"
             className="text-sm font-medium text-amber-700 transition-colors hover:text-amber-800"
           >
-            Forgot password?
+            {t("auth.forgotPassword")}
           </Link>
         </div>
         <PasswordInput
@@ -112,8 +120,18 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
         disabled={isSubmitting}
         icon={LogIn}
       >
-        {isSubmitting ? "Signing in..." : "Sign in"}
+        {isSubmitting ? t("auth.loggingIn") : t("auth.loginAction")}
       </Button>
+
+      <p className="text-center text-sm text-stone-500">
+        {t("auth.noAccount")}{" "}
+        <Link
+          href="/signup"
+          className="font-medium text-amber-700 transition-colors hover:text-amber-800"
+        >
+          {t("common.getStarted")}
+        </Link>
+      </p>
     </form>
   );
 }

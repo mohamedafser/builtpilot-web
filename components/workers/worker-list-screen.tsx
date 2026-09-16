@@ -1,5 +1,6 @@
 "use client";
 
+import { Can } from "@/components/permissions/can";
 import { AssignWorkersToProjectsDialog } from "@/components/workers/assign-workers-to-projects-dialog";
 import { WorkerList } from "@/components/workers/worker-list";
 import { WorkerListSkeleton } from "@/components/workers/worker-skeletons";
@@ -9,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useDisclosure } from "@/hooks/use-disclosure";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/pagination";
 import { requestJson } from "@/lib/api/client";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 import type { WorkerListItem } from "@/lib/workers/types";
 import { FilterX, Plus, UserPlus, Users, X } from "lucide-react";
@@ -26,6 +28,7 @@ type WorkerListResponse = {
 };
 
 export function WorkerListScreen() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -143,7 +146,7 @@ export function WorkerListScreen() {
   }
 
   if (error) {
-    return <Alert variant="error">{error}</Alert>;
+    return <Alert variant="error">{t("workers.loadError")}</Alert>;
   }
 
   const total = result?.total ?? 0;
@@ -154,12 +157,12 @@ export function WorkerListScreen() {
       <EmptyState
         icon={Users}
         title={
-          hasActiveFilters ? "No matching workers" : "No workers added yet."
+          hasActiveFilters ? "No matching workers" : t("workers.empty")
         }
         description={
           hasActiveFilters
             ? "Try a different search, role, status, or assigned project filter."
-            : "Add masons, helpers, and other site crew so they can be assigned to projects."
+            : t("workers.emptyHint")
         }
         action={
           hasActiveFilters ? (
@@ -167,12 +170,14 @@ export function WorkerListScreen() {
               href="/workers"
               className={cn(linkButtonClassName("secondary"))}
             >
-              <WithIcon icon={FilterX}>Clear filters</WithIcon>
+              <WithIcon icon={FilterX}>{t("common.clearFilters")}</WithIcon>
             </Link>
           ) : (
-            <Link href="/workers/new" className={cn(linkButtonClassName())}>
-              <WithIcon icon={Plus}>Add worker</WithIcon>
-            </Link>
+            <Can permission="labour.create">
+              <Link href="/workers/new" className={cn(linkButtonClassName())}>
+                <WithIcon icon={Plus}>{t("workers.new")}</WithIcon>
+              </Link>
+            </Can>
           )
         }
       />

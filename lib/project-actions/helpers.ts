@@ -8,7 +8,7 @@ import { PROJECT_ACTION_KEYS } from "@/lib/project-actions/types";
 
 const CTA_BY_KEY: Record<string, string> = {
   [PROJECT_ACTION_KEYS.RECEIVE_MATERIAL]: "Receive material",
-  [PROJECT_ACTION_KEYS.REVIEW_LABOUR]: "Review labour",
+  [PROJECT_ACTION_KEYS.REVIEW_LABOUR]: "Mark attendance",
   [PROJECT_ACTION_KEYS.REVIEW_QUOTATION]: "Review quotation",
 };
 

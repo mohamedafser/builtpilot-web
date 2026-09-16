@@ -1,3 +1,4 @@
+import { PermissionGuard } from "@/components/permissions/permission-guard";
 import { ProjectForm } from "@/components/projects/project-form";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { Alert } from "@/components/ui/alert";
@@ -21,7 +22,7 @@ export default async function NewProjectPage() {
   }
 
   return (
-    <>
+    <PermissionGuard permission="projects.create">
       <Breadcrumbs
         items={[
           { label: "Projects", href: "/projects" },
@@ -40,6 +41,6 @@ export default async function NewProjectPage() {
           <ProjectForm />
         </CardContent>
       </Card>
-    </>
+    </PermissionGuard>
   );
 }

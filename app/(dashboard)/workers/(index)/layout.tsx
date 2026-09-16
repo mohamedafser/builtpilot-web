@@ -2,6 +2,7 @@ import { WorkerFilters } from "@/components/workers/worker-filters";
 import { Alert } from "@/components/ui/alert";
 import { linkButtonClassName } from "@/components/ui/button";
 import { WithIcon } from "@/components/ui/with-icon";
+import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { getWorkerProjectFilterOptions } from "@/lib/workers/queries";
 import { getWorkspaceContext } from "@/lib/workspace";
@@ -14,7 +15,7 @@ export default async function WorkersIndexLayout({
 }: {
   children: ReactNode;
 }) {
-  const [{ business }, { projects }] = await Promise.all([
+  const [{ business, role }, { projects }] = await Promise.all([
     getWorkspaceContext(),
     getWorkerProjectFilterOptions(),
   ]);
@@ -34,9 +35,11 @@ export default async function WorkersIndexLayout({
           <p className="text-sm text-stone-500">
             Crew linked to {business.name}.
           </p>
-          <Link href="/workers/new" className={cn(linkButtonClassName())}>
-            <WithIcon icon={Plus}>Add worker</WithIcon>
-          </Link>
+          {hasPermission(role, "labour.create") ? (
+            <Link href="/workers/new" className={cn(linkButtonClassName())}>
+              <WithIcon icon={Plus}>Add worker</WithIcon>
+            </Link>
+          ) : null}
         </div>
         <Suspense fallback={<div className="h-12" />}>
           <WorkerFilters projects={projects} />

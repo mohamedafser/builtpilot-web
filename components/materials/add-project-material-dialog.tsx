@@ -111,7 +111,10 @@ export function AddProjectMaterialDialog({
         aria-labelledby="add-material-title"
         className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white p-5 shadow-lg sm:max-w-lg sm:rounded-xl"
       >
-        <h2 id="add-material-title" className="text-base font-semibold text-stone-900">
+        <h2
+          id="add-material-title"
+          className="text-base font-semibold text-stone-900"
+        >
           Add material to project
         </h2>
         <p className="mt-1 text-sm text-stone-500">
@@ -138,8 +141,9 @@ export function AddProjectMaterialDialog({
                 <option value="">Select material</option>
                 {materials.map((material) => (
                   <option key={material.id} value={material.id}>
-                    {material.name} · {MATERIAL_CATEGORY_LABELS[material.category]}{" "}
-                    ({MATERIAL_UNIT_SHORT_LABELS[material.unit]})
+                    {material.name} ·{" "}
+                    {MATERIAL_CATEGORY_LABELS[material.category]} (
+                    {MATERIAL_UNIT_SHORT_LABELS[material.unit]})
                   </option>
                 ))}
               </Select>

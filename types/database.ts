@@ -6,7 +6,15 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type UserRole = "owner" | "admin" | "member";
+export type UserRole =
+  | "owner"
+  | "admin"
+  | "project_manager"
+  | "engineer"
+  | "site_supervisor"
+  | "worker"
+  | "member";
+
 export type MemberRole = UserRole;
 
 export type AIMessageRole = "user" | "assistant";
@@ -216,6 +224,7 @@ export type Database = {
           id: string;
           name: string;
           owner_id: string;
+          created_by: string | null;
           country_code: string;
           currency_code: string;
           created_at: string;
@@ -225,6 +234,7 @@ export type Database = {
           id?: string;
           name: string;
           owner_id: string;
+          created_by?: string | null;
           country_code?: string;
           currency_code?: string;
           created_at?: string;
@@ -234,6 +244,7 @@ export type Database = {
           id?: string;
           name?: string;
           owner_id?: string;
+          created_by?: string | null;
           country_code?: string;
           currency_code?: string;
           created_at?: string;
@@ -243,6 +254,64 @@ export type Database = {
           {
             foreignKeyName: "businesses_owner_id_fkey";
             columns: ["owner_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "businesses_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_invitations: {
+        Row: {
+          id: string;
+          business_id: string;
+          email: string;
+          role: MemberRole;
+          invited_by: string;
+          token_hash: string;
+          expires_at: string;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          email: string;
+          role: MemberRole;
+          invited_by: string;
+          token_hash: string;
+          expires_at: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          email?: string;
+          role?: MemberRole;
+          invited_by?: string;
+          token_hash?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "business_invitations_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "business_invitations_invited_by_fkey";
+            columns: ["invited_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -2397,6 +2466,15 @@ export type Database = {
           target_country_code?: string;
         };
         Returns: number;
+      };
+      setup_owner_business: {
+        Args: {
+          target_user_id: string;
+          target_business_name: string;
+          target_country_code?: string;
+          target_language?: string;
+        };
+        Returns: string;
       };
       is_business_member: {
         Args: { target_business_id: string };

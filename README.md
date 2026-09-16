@@ -44,6 +44,7 @@ Then fill in:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=you@gmail.com
@@ -51,9 +52,9 @@ SMTP_PASS=your-gmail-app-password
 EMAIL_FROM=BuildPilot <you@gmail.com>
 ```
 
-Use only the public anon key in this app. Do not put the `service_role` key in `.env.local` or any client-side code.
+Keep `SUPABASE_SERVICE_ROLE_KEY` server-only (never prefix with `NEXT_PUBLIC_`). It is required for OTP email verification and owner organization setup after signup.
 
-Signup and password-reset emails are sent by **Supabase Auth** automatically. Quotation emails cannot use that mailer, so they go through **Gmail SMTP** instead. That lets you send from your Gmail address to any client without verifying a domain.
+Signup verification and password-reset codes are sent by **BuildPilot SMTP OTP** (not Supabase Auth emails). Quotation emails also use Gmail SMTP so you can send from your Gmail address without verifying a domain.
 
 1. Turn on 2-Step Verification for the Gmail account.
 2. Create an [App Password](https://myaccount.google.com/apppasswords).
@@ -92,6 +93,7 @@ In the Supabase dashboard, open **SQL Editor** and run these files in order:
 16. `supabase/migrations/20240914000000_ai_assistant.sql`
 17. `supabase/migrations/20240914120000_whatsapp_notifications.sql`
 18. `supabase/migrations/20240914140000_locale_currency.sql`
+19. later migrations under `supabase/migrations/` (email OTPs, owner organization setup, etc.)
 
 Alternatively, if you use the Supabase CLI:
 
@@ -103,7 +105,7 @@ npx supabase db push
 
 The migrations create:
 
-- `profiles`, `businesses`, `business_members`, `projects`
+- `profiles`, `businesses`, `business_members`, `business_invitations`, `projects`
 - extra project fields (`client_phone`, `client_email`, `description`, `archived_at`)
 - daily site reports, manpower snapshots, material snapshots, and site photo metadata
 - workers, project assignments, daily attendance, and labour cost records
@@ -114,9 +116,10 @@ The migrations create:
 - client portal access tokens, visibility settings, and read-only portal RPCs
 - AI conversations, messages, and usage tracking
 - WhatsApp message logs, webhook event idempotency, in-app notifications, and notification preferences
+- email OTP storage (`email_otps`) for signup and password-reset verification
 - a private `site-photos` Storage bucket with membership-scoped policies
 - membership-based Row Level Security
-- a trigger that creates a profile, a default business, and an owner membership when a user signs up
+- signup creates a profile only; the organization/business and **owner** membership are created after OTP verification
 
 ### 5. Configure Auth redirect URLs
 
@@ -141,20 +144,24 @@ If Site URL stays on localhost, confirmation emails keep redirecting to localhos
 
 For local-only development, you can temporarily use Site URL `http://localhost:3000`, or disable **Confirm email** under **Authentication → Providers → Email**.
 
-Password reset emails use the same callback route and then send the user to `/reset-password`.
+Password reset uses SMTP OTP at `/forgot-password` → `/verify-reset` → `/reset-password` (same 6-digit flow as signup).
 
 ### Signup email verification (SMTP OTP)
 
-Signup verification codes are sent by BuildPilot via your configured SMTP
+Signup and password-reset verification codes are sent by BuildPilot via your configured SMTP
 (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`) — not by Supabase Auth emails.
 
-1. Apply the migration:
+1. Apply the migrations:
 
 ```bash
 npx supabase db push
 ```
 
-Or run `supabase/migrations/20260316110000_email_otps.sql` in the SQL editor.
+Or run these in the SQL editor (in order):
+
+- `supabase/migrations/20260316110000_email_otps.sql`
+- `supabase/migrations/20260316120000_email_otp_purpose.sql`
+- `supabase/migrations/20260316130000_owner_organization_setup.sql`
 
 2. Ensure `.env.local` has:
 
@@ -171,6 +178,118 @@ EMAIL_FROM=BuildPilot <you@gmail.com>
    until OTP verification marks `email_confirm` true.
 
 Users verify at `/verify-email` with the 6-digit code from the SMTP email.
+
+### Owner account creation and organization setup
+
+BuildPilot uses `businesses` / `business_members` as the organization model.
+
+#### Signup flow
+
+The signup form collects:
+
+- Full name
+- Email
+- Password
+- Company / organization name
+- Country and language (for locale/currency)
+
+There is **no role selector**. Users cannot choose `owner` on the frontend.
+
+After successful OTP verification:
+
+```text
+User
+  ↓
+Create organization (business)
+  ↓
+Create membership
+  ↓
+Assign OWNER role (server-side only)
+  ↓
+Redirect to Dashboard
+```
+
+#### Owner creation rules
+
+- The first verified user who creates the organization becomes **Owner**.
+- The owner role is assigned only by the server (`setup_owner_business` RPC).
+- Frontend requests cannot set `role: "owner"`.
+- Normal invitations cannot assign Owner.
+- Users cannot promote themselves to Owner.
+
+#### Roles
+
+```text
+owner
+  ↓
+admin
+  ↓
+project_manager
+  ↓
+engineer
+  ↓
+site_supervisor
+  ↓
+worker
+```
+
+Legacy `member` remains for older records. Display labels use title case (for example `Owner`, not `OWNER`).
+
+#### Team invitations
+
+Owners and admins can invite users from **Settings → Team management**.
+
+Invite roles shown in the UI:
+
+- Admin
+- Project Manager
+- Engineer
+- Site Supervisor
+- Worker
+
+Owner is never shown in the invite dropdown. The API and database also reject Owner assignment through invitations.
+
+Invitation emails are sent through the same SMTP configuration as signup OTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`). The email includes a **Create account** link that prefills the invited email and decrypts the organization name from an encrypted `org` query token. Invitations expire in **2 days**. Owners and admins can **resend** or **cancel** pending invitations from Settings → Team.
+
+If another account is already signed in when opening an invite link, BuildPilot prompts to **sign out and continue** so the invited user can create their account instead of redirecting to the current user's dashboard.
+
+Invited users join the organization when they sign up / verify (or sign in, if they already have an account) with the invited email.
+
+#### Permissions
+
+Authorization uses permission checks such as:
+
+```ts
+hasPermission(role, "organization.users.manage")
+```
+
+Owner automatically satisfies all permissions. Subscription/plan feature checks stay separate from role permissions.
+
+#### Header display
+
+After setup, the dashboard header shows:
+
+```text
+Organization: ABC Constructions · Role: Owner
+```
+
+#### Manual migration step
+
+Apply:
+
+```bash
+npx supabase db push
+```
+
+Or run `supabase/migrations/20260316130000_owner_organization_setup.sql` in the SQL editor.
+
+This migration:
+
+- extends organization roles
+- creates `business_invitations`
+- updates signup so only a profile is created on auth user insert
+- creates the organization + owner membership after OTP verification
+- blocks Owner role assignment through normal membership inserts/updates
 
 ### 6. Start the app
 
@@ -194,9 +313,10 @@ npm test
 
 ## What this foundation includes
 
-- Email/password signup, login, logout, and password reset
+- Email/password signup, login, logout, and SMTP OTP password reset
 - Protected `/dashboard`, `/ai`, `/projects`, `/quotations`, `/workers`, `/settings`, and `/account` routes
-- Automatic profile, business, and owner membership creation on signup
+- Owner organization setup after email verification (server-assigned Owner role)
+- Team invitations and role management for owners/admins
 - Project list, search, status filters, details, edit, and archive
 - Daily site reports with manpower, materials, and private site photos
 - Workers, project assignments, daily attendance, and labour summaries
@@ -204,8 +324,9 @@ npm test
 - Quotations, estimate vs actual comparison, convert-to-project, and client email on send
 - BuildPilot AI, a construction-aware assistant grounded in authorized project data
 - WhatsApp Business messaging (manual client updates, portal sharing) and in-app notifications
+- PWA install support (desktop and mobile)
 - Dashboard totals, recent projects, project cost overview, and latest site reports from live Supabase data
 
 ## What is intentionally not included
 
-Payments, payroll, full accounting, email/SMS marketing, automation engines, and subscription billing.
+Payments, payroll, full accounting, email/SMS marketing, automation engines, ownership-transfer UI, and subscription billing.

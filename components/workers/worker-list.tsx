@@ -6,6 +6,7 @@ import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/api/pagination";
 import { formatLabourCost } from "@/lib/labour/money";
 import type { WorkerListItem } from "@/lib/workers/types";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 function assignedLabel(worker: WorkerListItem): string {
@@ -81,34 +82,34 @@ export function WorkerList({
 
   return (
     <>
-      <div className="mb-3 flex items-center gap-2 md:hidden">
+      <div className="mb-2 flex items-center gap-2 md:hidden">
         <SelectAllCheckbox
           assignableIds={assignableIds}
           selectedIds={selectedIds}
           onToggleAll={onToggleAll}
         />
-        <span className="text-sm text-stone-600">Select all on this page</span>
+        <span className="text-xs text-stone-600">Select all on this page</span>
       </div>
 
-      <div className="hidden overflow-hidden rounded-xl border border-stone-200 bg-white md:block">
+      <div className="hidden overflow-hidden rounded-lg border border-stone-200 bg-white md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-stone-50 text-stone-500">
+            <thead className="bg-stone-50 text-[11px] uppercase tracking-wide text-stone-500">
               <tr>
-                <th className="w-10 px-4 py-3">
+                <th className="w-10 px-3 py-2">
                   <SelectAllCheckbox
                     assignableIds={assignableIds}
                     selectedIds={selectedIds}
                     onToggleAll={onToggleAll}
                   />
                 </th>
-                <th className="px-4 py-3 font-medium">Worker</th>
-                <th className="px-4 py-3 font-medium">Role</th>
-                <th className="px-4 py-3 font-medium">Phone</th>
-                <th className="px-4 py-3 font-medium">Daily wage</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Assigned projects</th>
-                <th className="px-4 py-3 font-medium">
+                <th className="px-3 py-2 font-medium">Worker</th>
+                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">Phone</th>
+                <th className="px-3 py-2 font-medium">Daily wage</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Assigned projects</th>
+                <th className="px-3 py-2 font-medium">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
@@ -117,10 +118,17 @@ export function WorkerList({
               {workers.map((worker) => {
                 const inactive = worker.status !== "active";
                 const checked = selectedIds.includes(worker.id);
+                const hasProjects = worker.assigned_projects.length > 0;
 
                 return (
-                  <tr key={worker.id} className="border-t border-stone-100">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={worker.id}
+                    className={cn(
+                      "border-t border-stone-100",
+                      hasProjects && "bg-amber-50/25",
+                    )}
+                  >
+                    <td className="px-3 py-2">
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-amber-600"
@@ -135,34 +143,41 @@ export function WorkerList({
                         onChange={() => onToggleWorker(worker)}
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <Link
                         href={`/workers/${worker.id}`}
                         className="font-medium text-stone-900 hover:text-amber-700"
                       >
                         {worker.name}
                       </Link>
+                      {hasProjects ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-800">
+                          Assigned to project
+                        </p>
+                      ) : null}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <WorkerRoleBadge role={worker.role} />
                     </td>
-                    <td className="px-4 py-3 text-stone-600">
+                    <td className="px-3 py-2 text-stone-600">
                       {worker.phone || "—"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-stone-600">
+                    <td className="px-3 py-2 whitespace-nowrap text-stone-600 tabular-nums">
                       {formatLabourCost(worker.daily_wage)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <WorkerStatusBadge status={worker.status} />
                     </td>
-                    <td className="px-4 py-3 text-stone-600">
+                    <td className="px-3 py-2 text-stone-600">
                       {assignedLabel(worker)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <WorkerActions
                         workerId={worker.id}
                         workerName={worker.name}
                         status={worker.status}
+                        showView={false}
+                        compact
                       />
                     </td>
                   </tr>
@@ -174,20 +189,26 @@ export function WorkerList({
         {pager}
       </div>
 
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-2 md:hidden">
         {workers.map((worker) => {
           const inactive = worker.status !== "active";
           const checked = selectedIds.includes(worker.id);
+          const hasProjects = worker.assigned_projects.length > 0;
 
           return (
             <article
               key={worker.id}
-              className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+              className={cn(
+                "rounded-lg border bg-white p-3",
+                hasProjects
+                  ? "border-amber-200 bg-amber-50/40"
+                  : "border-stone-200",
+              )}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2.5">
                 <input
                   type="checkbox"
-                  className="mt-1 h-5 w-5 shrink-0 accent-amber-600"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600"
                   checked={checked}
                   disabled={inactive}
                   aria-label={`Select ${worker.name}`}
@@ -199,24 +220,29 @@ export function WorkerList({
                   onChange={() => onToggleWorker(worker)}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <Link
                         href={`/workers/${worker.id}`}
-                        className="text-base font-semibold text-stone-900 hover:text-amber-700"
+                        className="text-sm font-semibold text-stone-900 hover:text-amber-700"
                       >
                         {worker.name}
                       </Link>
-                      <div className="mt-2">
+                      {hasProjects ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-800">
+                          Assigned to project
+                        </p>
+                      ) : null}
+                      <div className="mt-1">
                         <WorkerRoleBadge role={worker.role} />
                       </div>
                     </div>
                     <WorkerStatusBadge status={worker.status} />
                   </div>
-                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <dt className="text-stone-500">Daily wage</dt>
-                      <dd className="mt-0.5 font-medium text-stone-800">
+                      <dd className="mt-0.5 font-medium text-stone-800 tabular-nums">
                         {formatLabourCost(worker.daily_wage)}
                       </dd>
                     </div>
@@ -226,18 +252,20 @@ export function WorkerList({
                         {worker.phone || "—"}
                       </dd>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <dt className="text-stone-500">Projects</dt>
                       <dd className="mt-0.5 text-stone-800">
                         {assignedLabel(worker)}
                       </dd>
                     </div>
                   </dl>
-                  <div className="mt-4">
+                  <div className="mt-2.5">
                     <WorkerActions
                       workerId={worker.id}
                       workerName={worker.name}
                       status={worker.status}
+                      showView={false}
+                      compact
                       layout="stack"
                     />
                   </div>
@@ -246,7 +274,7 @@ export function WorkerList({
             </article>
           );
         })}
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
           {pager}
         </div>
       </div>

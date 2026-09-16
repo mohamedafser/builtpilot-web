@@ -60,7 +60,24 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Allow pending verification without a session.
+  // Invite signup links keep query params; only redirect when the session already
+  // matches the invited email (or there is no invite context).
   if (user && (pathname === "/login" || pathname === "/signup")) {
+    const invitedEmail = request.nextUrl.searchParams
+      .get("email")
+      ?.trim()
+      .toLowerCase();
+    const sessionEmail = user.email?.trim().toLowerCase() ?? "";
+    const isInviteSignup =
+      pathname === "/signup" &&
+      Boolean(invitedEmail) &&
+      (request.nextUrl.searchParams.has("org") ||
+        request.nextUrl.searchParams.has("organization"));
+
+    if (isInviteSignup && invitedEmail && sessionEmail !== invitedEmail) {
+      return supabaseResponse;
+    }
+
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";

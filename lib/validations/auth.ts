@@ -9,10 +9,32 @@ import {
 } from "@/lib/i18n/config";
 import { z } from "zod";
 
-const emailSchema = z.string().trim().email("Enter a valid email address.");
+const emailSchema = z
+  .string()
+  .trim()
+  .min(1, "Email is required.")
+  .email("Enter a valid email address.");
+
+/** Basic password for login (existing accounts may not match new strength rules). */
 const passwordSchema = z
   .string()
+  .min(1, "Password is required.")
   .min(8, "Password must be at least 8 characters.");
+
+/**
+ * Strong password for signup / reset:
+ * 8+ chars, 1 uppercase, 1 number, 1 special character.
+ */
+const strongPasswordSchema = z
+  .string()
+  .min(1, "Password is required.")
+  .min(8, "Password must be at least 8 characters.")
+  .regex(/[A-Z]/, "Password must include at least one uppercase letter.")
+  .regex(/[0-9]/, "Password must include at least one number.")
+  .regex(
+    /[^A-Za-z0-9]/,
+    "Password must include at least one special character.",
+  );
 
 const supportedCountrySchema = z.enum(SUPPORTED_COUNTRIES, {
   message: "Select India or United Arab Emirates.",
@@ -32,19 +54,20 @@ export const signupSchema = z
     full_name: z
       .string()
       .trim()
+      .min(1, "Full name is required.")
       .min(2, "Full name must be at least 2 characters.")
       .max(80, "Full name is too long."),
     business_name: z
       .string()
       .trim()
-      .min(2, "Business name must be at least 2 characters.")
-      .max(120, "Business name is too long."),
-    country_code: supportedCountrySchema,
-    language: z.enum(SUPPORTED_LANGUAGES),
+      .min(1, "Company name is required.")
+      .min(2, "Company name must be at least 2 characters.")
+      .max(120, "Company name is too long."),
     email: emailSchema,
-    password: passwordSchema,
-    confirm_password: z.string().min(1, "Confirm your password."),
+    password: strongPasswordSchema,
+    confirm_password: z.string().min(1, "Confirm password is required."),
   })
+  .strict()
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match.",
     path: ["confirm_password"],
@@ -80,8 +103,8 @@ export const verifyPasswordResetOtpSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
-    password: passwordSchema,
-    confirm_password: z.string().min(1, "Confirm your password."),
+    password: strongPasswordSchema,
+    confirm_password: z.string().min(1, "Confirm password is required."),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords do not match.",

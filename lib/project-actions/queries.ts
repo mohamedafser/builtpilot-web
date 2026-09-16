@@ -1,3 +1,4 @@
+import { readMaterialsAdjustmentsSeenAt } from "@/lib/materials/adjustments-seen-server";
 import { toActionView } from "@/lib/project-actions/helpers";
 import type {
   ProjectAction,
@@ -115,6 +116,9 @@ export async function getBusinessPendingActionSummary(): Promise<{
   summary: ProjectActionCounts & {
     projectsWithActions: number;
     receiveMaterialPending: number;
+    reviewLabourPending: number;
+    projectsAttentionPending: number;
+    adjustedMaterialsCount: number;
     actions: ProjectActionView[];
   };
   error: string | null;
@@ -124,6 +128,9 @@ export async function getBusinessPendingActionSummary(): Promise<{
     byType: {} as Partial<Record<ProjectActionType, number>>,
     projectsWithActions: 0,
     receiveMaterialPending: 0,
+    reviewLabourPending: 0,
+    projectsAttentionPending: 0,
+    adjustedMaterialsCount: 0,
     actions: [] as ProjectActionView[],
   };
 
@@ -134,7 +141,24 @@ export async function getBusinessPendingActionSummary(): Promise<{
   }
 
   const supabase = await createClient();
-  const [{ data, error }, receiveCountResult] = await Promise.all([
+  const adjustmentsSeenAt = await readMaterialsAdjustmentsSeenAt();
+
+  let adjustmentsQuery = supabase
+    .from("material_transactions")
+    .select("material_id")
+    .eq("business_id", scope.business.id)
+    .eq("transaction_type", "adjusted");
+
+  if (adjustmentsSeenAt) {
+    adjustmentsQuery = adjustmentsQuery.gt("created_at", adjustmentsSeenAt);
+  }
+
+  const [
+    { data, error },
+    receiveCountResult,
+    labourCountResult,
+    adjustmentsResult,
+  ] = await Promise.all([
     supabase
       .from("project_actions")
       .select("*, projects!inner(name)")
@@ -148,10 +172,21 @@ export async function getBusinessPendingActionSummary(): Promise<{
       .eq("business_id", scope.business.id)
       .eq("status", "pending")
       .eq("action_key", "RECEIVE_MATERIAL"),
+    supabase
+      .from("project_actions")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", scope.business.id)
+      .eq("status", "pending")
+      .eq("action_key", "REVIEW_LABOUR"),
+    adjustmentsQuery,
   ]);
 
   if (error) {
     return { summary: empty, error: error.message };
+  }
+
+  if (adjustmentsResult.error) {
+    return { summary: empty, error: adjustmentsResult.error.message };
   }
 
   const actions = (data ?? []).map((row) => {
@@ -172,12 +207,23 @@ export async function getBusinessPendingActionSummary(): Promise<{
     projectSet.add(action.project_id);
   }
 
+  const receiveMaterialPending = receiveCountResult.count ?? 0;
+  const reviewLabourPending = labourCountResult.count ?? 0;
+  const adjustedMaterialIds = new Set(
+    (adjustmentsResult.data ?? [])
+      .map((row) => row.material_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
   return {
     summary: {
       totalPending: actions.length,
       byType,
       projectsWithActions: projectSet.size,
-      receiveMaterialPending: receiveCountResult.count ?? 0,
+      receiveMaterialPending,
+      reviewLabourPending,
+      projectsAttentionPending: receiveMaterialPending + reviewLabourPending,
+      adjustedMaterialsCount: adjustedMaterialIds.size,
       actions,
     },
     error: null,
